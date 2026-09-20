@@ -288,24 +288,24 @@ export default function App() {
         user={user}
         darkMode={darkMode}
         onOpenVoiceCall={() => handleOpenVoiceCall()}
+        onStartSprint={() => setActiveTab('challenge')}
+        onOpenVoiceCallWithTopic={(topic) => handleOpenVoiceCall(topic)}
       />
 
-      {/* Floating Voice Call Shortcut */}
+      {/* Floating Voice Call Shortcut (Positioned neatly beside Mascot) */}
       {adminSettings?.features?.voiceCallEnabled && (
-        <aside aria-label="Voice Tutor Call" className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-30 hidden sm:block">
+        <aside aria-label="Voice Tutor Call" className="fixed bottom-20 sm:bottom-6 right-22 sm:right-26 z-30 hidden sm:block">
           <button
             onClick={() => handleOpenVoiceCall()}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            title="Start Voice Session"
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all hover:scale-105 active:scale-95 cursor-pointer border border-indigo-400/30"
+            title="Start Live Voice Session"
           >
-            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-              <PhoneCall className="w-3.5 h-3.5 fill-white" />
+            <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center">
+              <PhoneCall className="w-3.5 h-3.5 fill-white text-white" />
             </div>
-            <div className="text-left">
-              <span className="font-bold text-xs tracking-tight whitespace-nowrap text-white">
-                Voice Call
-              </span>
-            </div>
+            <span className="font-bold text-xs tracking-tight whitespace-nowrap text-white">
+              Voice Tutor
+            </span>
           </button>
         </aside>
       )}

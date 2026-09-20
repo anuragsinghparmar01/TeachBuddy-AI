@@ -46,7 +46,7 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isListeningMic, setIsListeningMic] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [showTranscript, setShowTranscript] = useState(true);
+  const [mobileTab, setMobileTab] = useState<'chat' | 'orb'>('chat');
   const [messages, setMessages] = useState<VoiceCallMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -54,6 +54,15 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const currentLangObj = INDIAN_LANGUAGES.find(l => l.code === selectedLanguage) || INDIAN_LANGUAGES[0];
+
+  const handleEndCall = () => {
+    audioService.stopSpeaking();
+    audioService.stopListening();
+    setIsListeningMic(false);
+    setIsAiSpeaking(false);
+    audioService.playSound('pop');
+    onClose();
+  };
 
   // Quick Indian academic prompts with icons
   const quickPrompts = [
@@ -298,8 +307,25 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
           }
         );
       }
-    } catch (e) {
+    } catch (e: any) {
       setIsThinking(false);
+      const friendlyFallback = e?.message || "I'm having a brief issue connecting to the AI tutor. Please check your Gemini API key in Settings.";
+      const errorAiMsg: VoiceCallMessage = {
+        id: `msg_ai_err_${Date.now()}`,
+        sender: 'buddy',
+        text: `⚠️ ${friendlyFallback}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorAiMsg]);
+      if (isSpeakerOn) {
+        audioService.speak(
+          friendlyFallback,
+          voiceGender,
+          user.voiceSpeed || 1.0,
+          user.voicePitch || 1.0,
+          selectedLanguage
+        );
+      }
     }
   };
 
@@ -314,44 +340,65 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-fadeIn font-outfit">
-      <div className="w-full max-w-4xl h-[92vh] max-h-[850px] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-white relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-6 bg-slate-950/85 backdrop-blur-xl animate-fadeIn font-outfit">
+      <div className="w-full h-full sm:h-[94vh] sm:max-h-[850px] max-w-5xl bg-slate-900 sm:border sm:border-slate-800 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-white relative">
         
         {/* Top Header Bar */}
-        <div className="px-4 sm:px-6 py-3.5 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between gap-2 z-20">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between gap-2 z-20 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="relative shrink-0">
               <div className={`w-3 h-3 rounded-full ${isAiSpeaking ? 'bg-emerald-400 animate-ping' : 'bg-indigo-400'}`} />
               <div className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-500" />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-black text-sm sm:text-base tracking-tight text-white flex items-center gap-1.5">
-                  <Bot className="w-4 h-4 text-indigo-400" />
-                  TeachBuddy Live • {voiceGender === 'female' ? 'Aditi (Mentor)' : 'Rishi (Mentor)'}
+                <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-white flex items-center gap-1.5 truncate">
+                  <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400 shrink-0" />
+                  <span className="truncate">TeachBuddy • {voiceGender === 'female' ? 'Aditi' : 'Rishi'}</span>
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                   {formatTime(callDuration)}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 hidden sm:block">
-                Indian Accent AI Tutor • Gemini Voice Mode
+                Indian Accent AI Tutor • Live Gemini Voice
               </p>
             </div>
           </div>
 
-          {/* Controls: Indian Language & Accent Selector */}
-          <div className="flex items-center gap-2">
+          {/* Mobile View Switcher (Chat vs Orb) */}
+          <div className="flex md:hidden bg-slate-800/90 p-0.5 rounded-xl border border-slate-700 shrink-0">
+            <button
+              onClick={() => setMobileTab('chat')}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${
+                mobileTab === 'chat' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
+              }`}
+            >
+              💬 Chat ({messages.length})
+            </button>
+            <button
+              onClick={() => setMobileTab('orb')}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${
+                mobileTab === 'orb' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
+              }`}
+            >
+              🎙️ Orb
+            </button>
+          </div>
+
+          {/* Header Controls: Language, Gender, and Hangup */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Language Switcher Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white transition"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white transition cursor-pointer"
+                title="Change Voice Language"
               >
                 <span>{currentLangObj.flag}</span>
-                <span className="hidden sm:inline">{currentLangObj.name}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden lg:inline">{currentLangObj.name}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
 
               {showLangDropdown && (
@@ -363,7 +410,7 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
                     <button
                       key={lang.code}
                       onClick={() => handleLanguageSelect(lang.code)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                         selectedLanguage === lang.code
                           ? 'bg-indigo-600 text-white font-bold'
                           : 'text-slate-300 hover:bg-slate-800'
@@ -380,45 +427,48 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
               )}
             </div>
 
-            {/* Gender Switch */}
-            <div className="flex bg-slate-800/80 p-0.5 rounded-xl border border-slate-700">
+            {/* Voice Gender Switcher (Desktop / Tablet) */}
+            <div className="hidden sm:flex bg-slate-800/80 p-0.5 rounded-xl border border-slate-700">
               <button
                 onClick={() => setVoiceGender('female')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                  voiceGender === 'female' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                  voiceGender === 'female' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
                 }`}
               >
                 👩 Aditi
               </button>
               <button
                 onClick={() => setVoiceGender('male')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                  voiceGender === 'male' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                  voiceGender === 'male' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
                 }`}
               >
                 👨 Rishi
               </button>
             </div>
 
-            {/* End Call Button */}
+            {/* Header Red End Call Button */}
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition active:scale-95"
+              onClick={handleEndCall}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-600/30 transition active:scale-95 cursor-pointer"
               title="End Voice Call"
             >
-              <PhoneOff className="w-4 h-4" />
+              <PhoneOff className="w-3.5 h-3.5" />
+              <span className="font-bold">End</span>
             </button>
           </div>
         </div>
 
-        {/* Main Body: Dual-Pane Gemini Orb + Live Transcript */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden relative">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-12 overflow-hidden relative">
           
-          {/* Left / Center: Gemini Fluid Audio Visualizer Aura */}
-          <div className="md:col-span-5 flex flex-col items-center justify-center p-6 border-b md:border-b-0 md:border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 relative">
+          {/* Visualizer Orb Panel (Desktop: Left Col, Mobile: Shown when mobileTab === 'orb') */}
+          <div className={`${
+            mobileTab === 'orb' ? 'flex' : 'hidden md:flex'
+          } md:col-span-5 flex-col items-center justify-center p-4 sm:p-6 border-b md:border-b-0 md:border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 overflow-y-auto relative`}>
             
             {/* Pulsing Gemini Aura */}
-            <div className="relative flex items-center justify-center w-64 h-64 sm:w-72 sm:h-72">
+            <div className="relative flex items-center justify-center w-52 h-52 sm:w-64 sm:h-64 my-auto">
               {/* Outer Radiant Waves */}
               <div className={`absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-teal-400/20 blur-2xl transition-all duration-700 ${
                 isAiSpeaking ? 'scale-125 opacity-100 animate-pulse' : isListeningMic ? 'scale-110 opacity-75' : 'scale-90 opacity-40'
@@ -426,16 +476,16 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
 
               {/* Orbital Light Rings */}
               <div 
-                className="absolute w-56 h-56 rounded-full border border-indigo-500/30 animate-spin" 
+                className="absolute w-44 h-44 sm:w-56 sm:h-56 rounded-full border border-indigo-500/30 animate-spin" 
                 style={{ animationDuration: isAiSpeaking ? '4s' : '12s' }}
               />
               <div 
-                className="absolute w-44 h-44 rounded-full border border-teal-400/30 animate-spin" 
+                className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-teal-400/30 animate-spin" 
                 style={{ animationDuration: isAiSpeaking ? '3s' : '9s', animationDirection: 'reverse' }}
               />
 
               {/* Center Fluid Orb */}
-              <div className={`w-32 h-32 sm:w-36 sm:h-36 rounded-full p-1 bg-gradient-to-tr from-indigo-500 via-purple-500 to-emerald-400 shadow-2xl transition-transform duration-500 ${
+              <div className={`w-28 h-28 sm:w-36 sm:h-36 rounded-full p-1 bg-gradient-to-tr from-indigo-500 via-purple-500 to-emerald-400 shadow-2xl transition-transform duration-500 ${
                 isAiSpeaking ? 'scale-110 shadow-indigo-500/60' : isListeningMic ? 'scale-105 shadow-emerald-500/50' : 'scale-95 shadow-indigo-500/30'
               }`}>
                 <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
@@ -470,7 +520,7 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
             </div>
 
             {/* Status & Live Mic Feedback */}
-            <div className="mt-4 text-center space-y-1 z-10">
+            <div className="mt-3 text-center space-y-1 z-10">
               <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-300">
                 {isListeningMic ? (
                   <span className="flex items-center gap-1.5 text-emerald-400">
@@ -480,7 +530,7 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
                 ) : isAiSpeaking ? (
                   <span className="flex items-center gap-1.5 text-indigo-400">
                     <Volume2 className="w-4 h-4 animate-bounce" />
-                    Answering with Active Check Question
+                    Explaining with Active Concept Check
                   </span>
                 ) : isThinking ? (
                   <span className="flex items-center gap-1.5 text-amber-400">
@@ -495,41 +545,73 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
               </div>
 
               {interimTranscript && (
-                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-200 animate-fadeIn max-w-xs">
+                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-200 animate-fadeIn max-w-xs mx-auto">
                   "{interimTranscript}"
                 </div>
               )}
             </div>
 
             {/* Quick Action Pills */}
-            <div className="mt-4 flex flex-wrap justify-center gap-1.5 max-w-sm">
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5 max-w-sm">
               {quickPrompts.map((qp, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleSendStudentMessage(qp.prompt)}
-                  className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-[11px] font-medium text-slate-300 hover:text-white transition active:scale-95"
+                  onClick={() => {
+                    handleSendStudentMessage(qp.prompt);
+                    setMobileTab('chat');
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-medium text-slate-300 hover:text-white transition active:scale-95 cursor-pointer"
                 >
                   ⚡ {qp.label}
                 </button>
               ))}
             </div>
+
+            {/* Mobile Button to jump to Chat */}
+            <div className="mt-4 md:hidden">
+              <button
+                onClick={() => setMobileTab('chat')}
+                className="text-xs px-4 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 font-bold flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                View Full Conversation ({messages.length} messages) →
+              </button>
+            </div>
           </div>
 
-          {/* Right: Real-time Transcript & Chat Interaction */}
-          <div className="md:col-span-7 flex flex-col bg-slate-900/60 overflow-hidden">
-            {/* Transcript Top Bar */}
-            <div className="px-4 py-2.5 bg-slate-950/40 border-b border-slate-800/80 flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-400 flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-                Live Conversation Log
-              </span>
-              <span className="text-[10px] text-emerald-400 font-medium">
-                Accurate Gemini 2.5 Flash Reasoning
-              </span>
+          {/* Real-time Transcript & Chat Interaction Panel */}
+          <div className={`${
+            mobileTab === 'chat' ? 'flex' : 'hidden md:flex'
+          } md:col-span-7 flex-1 flex-col bg-slate-900/60 overflow-hidden`}>
+            
+            {/* Live Tutor Status Bar (Visible on mobile for clear situational awareness) */}
+            <div className="px-3.5 py-2 bg-slate-950/70 border-b border-slate-800/80 flex items-center justify-between text-xs shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-bold text-slate-300 flex items-center gap-1.5 truncate">
+                  <MessageSquare className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span className="truncate">Live Study Conversation</span>
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 shrink-0">
+                  {isAiSpeaking ? 'Speaking' : isListeningMic ? 'Listening' : 'Active'}
+                </span>
+              </div>
+              
+              {/* Audio Wave Bars */}
+              <div className="flex items-center gap-1 shrink-0">
+                {[8, 16, 24, 16, 8].map((h, i) => (
+                  <span
+                    key={i}
+                    className={`w-1 rounded-full transition-all ${
+                      isAiSpeaking ? 'bg-indigo-400 animate-pulse' : isListeningMic ? 'bg-emerald-400 animate-bounce' : 'bg-slate-700'
+                    }`}
+                    style={{ height: isAiSpeaking ? `${h}px` : isListeningMic ? `${h * 0.7}px` : '5px' }}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Transcript Messages List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -541,10 +623,10 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
                     </div>
                   )}
 
-                  <div className={`max-w-[85%] rounded-2xl p-3.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
+                  <div className={`max-w-[88%] sm:max-w-[82%] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
                     m.sender === 'user'
                       ? 'bg-indigo-600 text-white rounded-tr-none'
-                      : 'bg-slate-800/90 border border-slate-700/80 text-slate-100 rounded-tl-none'
+                      : 'bg-slate-800/95 border border-slate-700/80 text-slate-100 rounded-tl-none'
                   }`}>
                     <p className="font-medium whitespace-pre-wrap">{m.text}</p>
                     <span className="text-[9px] opacity-60 mt-1 block text-right">
@@ -565,7 +647,7 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
                   <div className="w-7 h-7 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-300 text-xs">
                     <Sparkles className="w-3.5 h-3.5 animate-spin" />
                   </div>
-                  <div className="p-3 rounded-2xl rounded-tl-none bg-slate-800/60 border border-slate-700 text-xs text-slate-400 flex items-center gap-2">
+                  <div className="p-3 rounded-2xl rounded-tl-none bg-slate-800/70 border border-slate-700 text-xs text-slate-300 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce delay-100" />
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce delay-200" />
@@ -577,23 +659,23 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
               <div ref={transcriptEndRef} />
             </div>
 
-            {/* Bottom Input Area */}
-            <div className="p-3 sm:p-4 bg-slate-950/70 border-t border-slate-800 space-y-2">
-              <div className="flex items-center gap-2">
-                {/* Voice Mic Toggle */}
+            {/* Quick Prompts Bar inside Chat View for Mobile & Desktop */}
+            <div className="px-3 py-1.5 bg-slate-950/40 border-t border-slate-800/50 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Quick:</span>
+              {quickPrompts.map((qp, idx) => (
                 <button
-                  onClick={handleToggleMic}
-                  className={`p-3 rounded-2xl transition flex items-center justify-center shrink-0 shadow-md ${
-                    isListeningMic
-                      ? 'bg-emerald-500 hover:bg-emerald-400 text-white animate-pulse'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                  }`}
-                  title={isListeningMic ? 'Stop listening' : 'Start speaking'}
+                  key={idx}
+                  onClick={() => handleSendStudentMessage(qp.prompt)}
+                  className="px-2.5 py-0.5 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-[11px] font-medium text-slate-300 whitespace-nowrap shrink-0 transition"
                 >
-                  {isListeningMic ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5 text-slate-400" />}
+                  ⚡ {qp.label}
                 </button>
+              ))}
+            </div>
 
-                {/* Text input for quiet study */}
+            {/* Text Input Row */}
+            <div className="p-2.5 sm:p-3 bg-slate-950/80 border-t border-slate-800 shrink-0">
+              <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
                   <input
                     type="text"
@@ -602,31 +684,65 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSendStudentMessage(inputText);
                     }}
-                    placeholder={`Ask in ${currentLangObj.name} (${currentLangObj.nativeName})...`}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder={`Type or ask in ${currentLangObj.name}...`}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-500"
                   />
                 </div>
 
-                {/* Send Button */}
                 <button
                   onClick={() => handleSendStudentMessage(inputText)}
                   disabled={!inputText.trim()}
-                  className="p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white shadow-md shadow-indigo-600/30 transition shrink-0 cursor-pointer"
+                  className="p-2.5 sm:p-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white shadow-md shadow-indigo-600/30 transition shrink-0 cursor-pointer"
                   title="Send message"
                 >
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-amber-400" />
-                  Hands-free Indian voice conversation enabled
-                </span>
-                <span>Language: {currentLangObj.name}</span>
-              </div>
             </div>
           </div>
+        </div>
+
+        {/* Dedicated Bottom Call Action Dock (Prominent & Always Accessible) */}
+        <div className="p-3 sm:p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-2 sm:gap-4 shrink-0 z-30">
+          {/* Mic Control Button */}
+          <button
+            onClick={handleToggleMic}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 shadow-md ${
+              isListeningMic
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+            title={isListeningMic ? 'Tap to mute microphone' : 'Tap to start voice recognition'}
+          >
+            {isListeningMic ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-slate-400" />}
+            <span className="hidden xs:inline">{isListeningMic ? 'Listening...' : 'Unmute Mic'}</span>
+          </button>
+
+          {/* Speaker Control */}
+          <button
+            onClick={() => {
+              setIsSpeakerOn(!isSpeakerOn);
+              if (isSpeakerOn) audioService.stopSpeaking();
+            }}
+            className={`p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer border shrink-0 ${
+              isSpeakerOn
+                ? 'bg-slate-800 hover:bg-slate-700 text-indigo-300 border-slate-700'
+                : 'bg-slate-800/60 text-slate-500 border-slate-800 line-through'
+            }`}
+            title={isSpeakerOn ? 'Mute AI Audio' : 'Unmute AI Audio'}
+          >
+            {isSpeakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {/* Big Persistent Call Hangup / End Call Button */}
+          <button
+            onClick={handleEndCall}
+            className="flex-1 max-w-xs flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-xl shadow-rose-600/40 transition cursor-pointer"
+            title="End Voice Call"
+          >
+            <PhoneOff className="w-4 h-4" />
+            <span>End Call</span>
+          </button>
         </div>
       </div>
     </div>

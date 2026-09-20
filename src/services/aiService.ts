@@ -10,38 +10,111 @@ interface GenerateOptions {
   model?: string;
 }
 
+export function cleanApiKey(raw: unknown): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .trim()
+    .replace(/^["'`]|["'`]$/g, '')
+    .trim();
+}
+
+export function getStoredMasterApiKey(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const directGemini = cleanApiKey(localStorage.getItem('teachbuddy_gemini_key'));
+    if (directGemini) return directGemini;
+    const master = cleanApiKey(localStorage.getItem('teachbuddy_master_key'));
+    if (master) return master;
+    const legacyKey = cleanApiKey(localStorage.getItem('teachbuddy_api_key'));
+    if (legacyKey) return legacyKey;
+  } catch {}
+  return '';
+}
+
 export function getModuleApiKeys(): ModuleApiKeys {
   if (typeof window === 'undefined') return { ...DEFAULT_MODULE_API_KEYS };
+  const masterKey = getStoredMasterApiKey();
+  const baseDefaults: ModuleApiKeys = {
+    explainKey: masterKey,
+    notesKey: masterKey,
+    voiceKey: masterKey,
+    solverKey: masterKey,
+    quizKey: masterKey,
+    generalKey: masterKey,
+  };
+
   try {
     const saved = localStorage.getItem('teachbuddy_module_keys');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Clean out any stale placeholder or dummy keys starting with AQ.
       const cleaned: Partial<ModuleApiKeys> = {};
-      Object.keys(parsed).forEach((k) => {
+      Object.keys(DEFAULT_MODULE_API_KEYS).forEach((k) => {
         const key = k as keyof ModuleApiKeys;
-        const val = parsed[key];
-        if (typeof val === 'string' && !val.startsWith('AQ.') && val.trim().length > 0) {
-          cleaned[key] = val.trim();
-        } else {
-          cleaned[key] = '';
-        }
+        const val = cleanApiKey(parsed[key]);
+        cleaned[key] = val || masterKey;
       });
-      return { ...DEFAULT_MODULE_API_KEYS, ...cleaned };
+      return { ...baseDefaults, ...cleaned };
     }
   } catch {}
-  return { ...DEFAULT_MODULE_API_KEYS };
+  return baseDefaults;
 }
 
 export function saveModuleApiKey(moduleName: keyof ModuleApiKeys, key: string) {
+  const cleaned = cleanApiKey(key);
   const current = getModuleApiKeys();
-  current[moduleName] = key.trim();
+  current[moduleName] = cleaned;
+  localStorage.setItem('teachbuddy_module_keys', JSON.stringify(current));
+  if (cleaned && (moduleName === 'generalKey' || !getStoredMasterApiKey())) {
+    localStorage.setItem('teachbuddy_gemini_key', cleaned);
+    localStorage.setItem('teachbuddy_master_key', cleaned);
+  }
+}
+
+export function setMasterApiKey(key: string) {
+  const cleaned = cleanApiKey(key);
+  if (cleaned) {
+    localStorage.setItem('teachbuddy_gemini_key', cleaned);
+    localStorage.setItem('teachbuddy_master_key', cleaned);
+  } else {
+    localStorage.removeItem('teachbuddy_gemini_key');
+    localStorage.removeItem('teachbuddy_master_key');
+  }
+
+  const current = getModuleApiKeys();
+  (Object.keys(current) as (keyof ModuleApiKeys)[]).forEach((mod) => {
+    current[mod] = cleaned;
+  });
   localStorage.setItem('teachbuddy_module_keys', JSON.stringify(current));
 }
 
 export function resetAllModuleApiKeys(): ModuleApiKeys {
   localStorage.removeItem('teachbuddy_module_keys');
+  localStorage.removeItem('teachbuddy_gemini_key');
+  localStorage.removeItem('teachbuddy_master_key');
   return { ...DEFAULT_MODULE_API_KEYS };
+}
+
+export function resolveEffectiveApiKey(options: GenerateOptions): string {
+  // 1. Explicit in options
+  const explicit = cleanApiKey(options.apiKey);
+  if (explicit) return explicit;
+
+  // 2. Module-specific key
+  const moduleKeys = getModuleApiKeys();
+  if (options.moduleKey) {
+    const modKey = cleanApiKey(moduleKeys[options.moduleKey]);
+    if (modKey) return modKey;
+  }
+
+  // 3. General module key
+  const generalKey = cleanApiKey(moduleKeys.generalKey);
+  if (generalKey) return generalKey;
+
+  // 4. Master key from storage
+  const master = getStoredMasterApiKey();
+  if (master) return master;
+
+  return '';
 }
 
 // Extract JSON safely from Gemini / Groq responses
@@ -99,37 +172,110 @@ function extractJson<T = any>(rawText: string): T {
   }
 }
 
-// Low-level caller to backend /api/ai/generate (Live Gemini 3.6 / Groq)
+// Direct browser-level Gemini REST fallback in case /api/ai/generate is unreachable
+async function directGeminiRestCall(apiKey: string, prompt: string, systemInstruction?: string, temperature?: number): Promise<string> {
+  const cleanedKey = cleanApiKey(apiKey);
+  if (!cleanedKey) throw new Error('Cannot make direct AI call without an API key.');
+
+  const models = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  let lastErr: any = null;
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanedKey}`;
+      const payload: any = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: temperature ?? 0.5,
+        },
+      };
+      if (systemInstruction) {
+        payload.systemInstruction = {
+          parts: [{ text: systemInstruction }],
+        };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && typeof text === 'string') {
+        return text;
+      }
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr || new Error('Direct Gemini API call failed.');
+}
+
+// Low-level caller to backend /api/ai/generate (Live Gemini / Groq) with zero-404 resilience
 async function callAiBackend(options: GenerateOptions): Promise<string> {
-  const moduleKeys = getModuleApiKeys();
-  const selectedKey = options.apiKey || (options.moduleKey ? moduleKeys[options.moduleKey] : moduleKeys.generalKey);
+  const selectedKey = resolveEffectiveApiKey(options);
 
-  const res = await fetch('/api/ai/generate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt: options.prompt,
-      systemInstruction: options.systemInstruction,
-      temperature: options.temperature ?? 0.5,
-      apiKey: selectedKey,
-      model: options.model,
-    }),
-  });
+  try {
+    const res = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: options.prompt,
+        systemInstruction: options.systemInstruction,
+        temperature: options.temperature ?? 0.5,
+        apiKey: selectedKey || undefined,
+        model: options.model,
+      }),
+    });
 
-  const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
 
-  if (!res.ok || data.error) {
-    const errorMsg = data.error || `Server responded with status ${res.status}`;
-    throw new Error(errorMsg);
+    if (res.ok && data.text && typeof data.text === 'string') {
+      return data.text;
+    }
+
+    // If server returned an error but we have a client key, fallback to direct Gemini call
+    if (selectedKey && !selectedKey.startsWith('gsk_')) {
+      try {
+        return await directGeminiRestCall(selectedKey, options.prompt, options.systemInstruction, options.temperature);
+      } catch (directErr: any) {
+        console.warn('Direct Gemini fallback failed:', directErr);
+      }
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    if (res.status === 404 || res.status === 502) {
+      throw new Error('TeachBuddy AI service is connecting. If this persists, please configure your Gemini API key in Settings.');
+    }
+
+    throw new Error(`Server responded with status ${res.status}`);
+  } catch (networkErr: any) {
+    // Attempt direct call if network failed or 404 occurred and client key is present
+    if (selectedKey && !selectedKey.startsWith('gsk_')) {
+      try {
+        return await directGeminiRestCall(selectedKey, options.prompt, options.systemInstruction, options.temperature);
+      } catch {}
+    }
+
+    const msg = networkErr?.message || '';
+    if (msg.includes('404') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+      throw new Error('TeachBuddy AI is active. Please add your Gemini API Key in Settings to connect your personal AI tutor.');
+    }
+    throw networkErr;
   }
-
-  if (!data.text || typeof data.text !== 'string') {
-    throw new Error('No text generated by the Live AI API.');
-  }
-
-  return data.text;
 }
 
 export const aiService = {
@@ -522,4 +668,28 @@ Output strictly a valid JSON array:
 
     return extractJson(raw);
   },
+
+  // 9. INSTANT AI ASSISTANT & CHAT
+  async askAssistant(
+    question: string,
+    languageCode: IndianLanguageCode = 'en-US',
+    ageGroup: AgeGroup = 'high_school'
+  ): Promise<string> {
+    const langObj = INDIAN_LANGUAGES.find(l => l.code === languageCode) || INDIAN_LANGUAGES[0];
+    const systemInstruction = `You are TeachBuddy AI Assistant, a brilliant, friendly, and motivating personal tutor.
+Provide a clear, direct, and well-structured answer in ${langObj.name} (${langObj.nativeName}).
+Keep answers concise, engaging, and easy to understand for a ${ageGroup.replace('_', ' ')} student.
+If formulas or steps are involved, explain them with clarity and simple analogies.`;
+
+    const prompt = `Student Question: "${question}"
+Please provide a helpful, encouraging explanation with key insights:`;
+
+    return await callAiBackend({
+      prompt,
+      systemInstruction,
+      temperature: 0.5,
+      moduleKey: 'generalKey',
+    });
+  },
 };
+

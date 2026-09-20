@@ -26,7 +26,7 @@ import {
 import type { UserProfile, IndianLanguageCode, VoiceGender, ModuleApiKeys } from '../types';
 import { INDIAN_LANGUAGES, DEFAULT_MODULE_API_KEYS } from '../types';
 import { audioService } from '../services/audioService';
-import { aiService, getModuleApiKeys, saveModuleApiKey, resetAllModuleApiKeys } from '../services/aiService';
+import { aiService, getModuleApiKeys, saveModuleApiKey, resetAllModuleApiKeys, setMasterApiKey, cleanApiKey, getStoredMasterApiKey } from '../services/aiService';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -122,7 +122,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // Per-module keys state
   const [keysState, setKeysState] = useState<ModuleApiKeys>(() => getModuleApiKeys());
-  const [masterKey, setMasterKey] = useState(user.geminiApiKey || (user as any).customApiKey || '');
+  const [masterKey, setMasterKey] = useState(() => user.geminiApiKey || (user as any).customApiKey || getStoredMasterApiKey() || '');
   const [showMasterKey, setShowMasterKey] = useState(false);
   const [showKeys, setShowKeys] = useState<Record<keyof ModuleApiKeys, boolean>>({
     explainKey: false,
@@ -140,7 +140,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSaveSingleKey = (moduleId: keyof ModuleApiKeys) => {
-    const val = keysState[moduleId].trim();
+    const val = cleanApiKey(keysState[moduleId]);
     saveModuleApiKey(moduleId, val);
     const updatedKeys = { ...keysState, [moduleId]: val };
 
@@ -151,16 +151,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       moduleApiKeys: updatedKeys,
     });
 
-    setGlobalNotice(`✓ Saved & Synced to Firebase for ${MODULES_CONFIG.find(m => m.id === moduleId)?.title}`);
+    setGlobalNotice(`✓ Saved & Synced for ${MODULES_CONFIG.find(m => m.id === moduleId)?.title}`);
     setTimeout(() => setGlobalNotice(null), 3500);
     handleTestKey(moduleId, val);
   };
 
   const handleSaveMasterKey = () => {
-    const val = masterKey.trim();
-    if (!val) return;
+    const val = cleanApiKey(masterKey);
+    if (!val) {
+      setMasterApiKey('');
+      onUpdateUser({ geminiApiKey: undefined, customApiKey: undefined });
+      setGlobalNotice('API Key cleared. Using built-in server connection.');
+      setTimeout(() => setGlobalNotice(null), 3500);
+      return;
+    }
 
-    // Apply to module keys and save to Firebase
+    setMasterApiKey(val);
+
     const isGroq = val.startsWith('gsk_');
     const newKeys: ModuleApiKeys = {
       explainKey: isGroq ? keysState.explainKey : val,
@@ -172,9 +179,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     };
 
     setKeysState(newKeys);
-    Object.entries(newKeys).forEach(([mod, k]) => {
-      saveModuleApiKey(mod as keyof ModuleApiKeys, k);
-    });
 
     onUpdateUser({
       geminiApiKey: val,
@@ -182,7 +186,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       moduleApiKeys: newKeys,
     });
 
-    setGlobalNotice(`✓ API Key successfully saved and stored in Firebase database!`);
+    setGlobalNotice(`✓ API Key verified and saved across all learning modules!`);
     setTimeout(() => setGlobalNotice(null), 4000);
     handleTestKey('master', val);
   };

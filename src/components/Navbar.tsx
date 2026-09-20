@@ -15,7 +15,9 @@ import {
   ChevronDown, 
   Gamepad2,
   Menu,
-  X
+  X,
+  Layers,
+  Zap
 } from 'lucide-react';
 import { AiIcon } from './AiIcon';
 import type { UserProfile, AdminSettings, ActiveTab, IndianLanguageCode } from '../types';
@@ -69,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const features = safeSettings.features || DEFAULT_ADMIN_SETTINGS.features;
   const isAdmin = user.email?.toLowerCase() === 'anuragsinghparmar95@gmail.com' || user.role === 'admin';
 
-  // Navigation Items
+  // Desktop Navigation Items
   const navItems: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'explain', label: 'Explain', icon: Sparkles },
     { id: 'notes', label: 'Notes', icon: BookOpen },
@@ -106,34 +108,34 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Top Navbar */}
       <header className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors duration-200 ${
         darkMode 
-          ? 'bg-[#0b0f19]/90 border-slate-800/80 text-white shadow-lg shadow-black/20' 
+          ? 'bg-[#090d16]/90 border-slate-800/80 text-white shadow-lg shadow-black/30' 
           : 'bg-white/90 border-slate-200/80 text-slate-900 shadow-sm shadow-slate-200/50'
       }`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
           {/* Brand - TeachBuddy AI */}
           <div 
-            className="flex items-center gap-3 cursor-pointer select-none group" 
+            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer select-none group" 
             onClick={() => onChangeTab('explain')}
           >
             <AiIcon size="sm" variant="gemini" glow={true} pulse={false} />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                  TeachBuddy<span className="text-indigo-600 dark:text-indigo-400">AI</span>
+                <span className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors font-outfit">
+                  TeachBuddy<span className="bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">AI</span>
                 </span>
-                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               </div>
               <span className="hidden sm:block text-[10px] font-medium text-slate-400 -mt-0.5 tracking-wide">
-                Interactive Learning Studio
+                Smart Indian AI Study Companion
               </span>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800/80 text-xs font-semibold backdrop-blur-md">
+          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-xs font-semibold backdrop-blur-md">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isTabActive(item.id);
@@ -144,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-200 cursor-pointer select-none ${
                     active
                       ? darkMode
-                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30 font-bold'
+                        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-600/30 font-bold'
                         : 'bg-white text-indigo-700 shadow-xs border border-slate-200/80 font-bold'
                       : darkMode
                         ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
@@ -174,9 +176,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {isLangOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-fadeIn">
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 animate-fadeIn">
                   <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Select Language
+                    Select Indian Language
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {INDIAN_LANGUAGES.map((lang) => (
@@ -203,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {features?.voiceCallEnabled && (
               <button
                 onClick={onOpenVoiceCall}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold transition shadow-md shadow-indigo-600/25 active:scale-95 cursor-pointer"
                 title="Start Voice Session with TeachBuddy"
               >
                 <PhoneCall className="w-3.5 h-3.5 fill-white/20" />
@@ -214,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Theme Toggle */}
             <button
               onClick={onToggleDarkMode}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               title="Toggle Theme"
             >
               {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
@@ -273,7 +275,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Expandable Drawer */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xl animate-fadeIn">
+          <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xl animate-fadeIn">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              All Study Features
+            </div>
             <div className="grid grid-cols-2 gap-2 pb-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -295,42 +300,106 @@ export const Navbar: React.FC<NavbarProps> = ({
               })}
             </div>
 
-            {isAdmin && (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
               <button
-                onClick={() => { handleOpenAdmin(); setIsMobileMenuOpen(false); }}
-                className="w-full mt-2 flex items-center justify-center gap-2 p-2.5 rounded-xl bg-purple-600 text-white text-xs font-bold"
+                onClick={() => {
+                  onOpenVoiceCall();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-bold shadow-md shadow-indigo-600/30"
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Open Admin Portal</span>
+                <PhoneCall className="w-4 h-4" />
+                <span>Start Live Voice Call Tutor</span>
               </button>
-            )}
+
+              {isAdmin && (
+                <button
+                  onClick={() => { handleOpenAdmin(); setIsMobileMenuOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-purple-600 text-white text-xs font-bold"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Open Admin Portal</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </header>
 
-      {/* FIXED MOBILE BOTTOM NAVIGATION BAR (Thumb Friendly, Ergonomic Dock) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 safe-area-bottom shadow-lg">
-        <div className="flex items-center justify-around px-1 py-1.5 max-w-lg mx-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isTabActive(item.id);
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleMobileNavigate(item.id)}
-                className={`flex flex-col items-center justify-center min-w-[44px] py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
-                  active
-                    ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
-                }`}
-              >
-                <div className={`p-1 rounded-lg ${active ? 'bg-indigo-50 dark:bg-indigo-950/50' : ''}`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] tracking-tight leading-none mt-0.5">{item.label}</span>
-              </button>
-            );
-          })}
+      {/* FIXED MOBILE BOTTOM NAVIGATION BAR (Ergonomic 5-Action Dock with Prominent Voice Call Orb) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#090d16]/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/90 safe-area-bottom shadow-2xl">
+        <div className="flex items-center justify-between px-3 py-1 max-w-md mx-auto">
+          {/* Explain Tab */}
+          <button
+            onClick={() => handleMobileNavigate('explain')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              isTabActive('explain')
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 font-medium'
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${isTabActive('explain') ? 'bg-indigo-50 dark:bg-indigo-950/60' : ''}`}>
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] tracking-tight leading-none mt-0.5">Explain</span>
+          </button>
+
+          {/* Notes Tab */}
+          <button
+            onClick={() => handleMobileNavigate('notes')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              isTabActive('notes')
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 font-medium'
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${isTabActive('notes') ? 'bg-indigo-50 dark:bg-indigo-950/60' : ''}`}>
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] tracking-tight leading-none mt-0.5">Notes</span>
+          </button>
+
+          {/* Centerpiece: Prominent Voice Call Button */}
+          <button
+            onClick={onOpenVoiceCall}
+            className="flex flex-col items-center justify-center -mt-4 cursor-pointer group"
+            title="Start Live AI Tutor Call"
+          >
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/40 group-active:scale-95 transition-all border-2 border-white dark:border-[#090d16]">
+              <PhoneCall className="w-5 h-5 animate-pulse" />
+            </div>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">Call Tutor</span>
+          </button>
+
+          {/* Solver Tab */}
+          <button
+            onClick={() => handleMobileNavigate('solver')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              isTabActive('solver')
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 font-medium'
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${isTabActive('solver') ? 'bg-indigo-50 dark:bg-indigo-950/60' : ''}`}>
+              <Calculator className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] tracking-tight leading-none mt-0.5">Solver</span>
+          </button>
+
+          {/* More Drawer Tab */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              isMobileMenuOpen
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 font-medium'
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${isMobileMenuOpen ? 'bg-indigo-50 dark:bg-indigo-950/60' : ''}`}>
+              <Layers className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] tracking-tight leading-none mt-0.5">More</span>
+          </button>
         </div>
       </nav>
     </>

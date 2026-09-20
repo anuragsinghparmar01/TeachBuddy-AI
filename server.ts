@@ -13,16 +13,41 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Health check endpoint
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Global CORS & preflight middleware for AI Studio iframe & cross-origin previews
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+    next();
   });
 
-  // API AI test connection route
-  app.post('/api/ai/test', async (req, res) => {
+  // Health check endpoints
+  const healthHandler = (_req: express.Request, res: express.Response) => {
+    res.json({ 
+      status: 'ok', 
+      service: 'TeachBuddy AI Studio',
+      geminiServerKeyConfigured: !!process.env.GEMINI_API_KEY,
+      supportedModels: ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'],
+      timestamp: new Date().toISOString() 
+    });
+  };
+  app.get('/api/health', healthHandler);
+  app.get('/api/ai/health', healthHandler);
+
+  const cleanKey = (key: unknown): string => {
+    if (!key || typeof key !== 'string') return '';
+    return key.trim().replace(/^["'`]|["'`]$/g, '').trim();
+  };
+
+  // Connection test route (GET & POST)
+  const testHandler = async (req: express.Request, res: express.Response) => {
     try {
-      const { apiKey: customKey } = req.body || {};
-      const rawKey = customKey ? customKey.trim() : '';
+      const customKey = req.method === 'POST' ? req.body?.apiKey : (req.query?.apiKey as string);
+      const rawKey = cleanKey(customKey);
       const apiKey = rawKey || process.env.GEMINI_API_KEY;
       if (!apiKey) {
         res.json({ ok: false, message: 'No API Key configured on server or in Settings' });
@@ -51,31 +76,54 @@ async function startServer() {
         return;
       }
 
-      // Google Gemini Live API test
+      // Google Gemini Live API test with resilient model candidates
       const ai = new GoogleGenAI({ apiKey });
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: 'Ping',
-        });
-        res.json({ ok: true, provider: 'Google Gemini', model: 'gemini-3.6-flash', reply: response.text?.trim() || 'OK' });
-      } catch {
-        const fallbackRes = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
-          contents: 'Ping',
-        });
-        res.json({ ok: true, provider: 'Google Gemini', model: 'gemini-flash-latest', reply: fallbackRes.text?.trim() || 'OK' });
+      const testModels = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      let testReply = '';
+      let testedModel = '';
+      let testErr: any = null;
+
+      for (const m of testModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model: m,
+            contents: 'Ping',
+          });
+          testReply = response.text?.trim() || 'OK';
+          testedModel = m;
+          break;
+        } catch (e: any) {
+          testErr = e;
+        }
+      }
+
+      if (testedModel) {
+        res.json({ ok: true, provider: 'Google Gemini', model: testedModel, reply: testReply });
+      } else {
+        throw testErr || new Error('Unable to connect to Google Gemini with this key');
       }
     } catch (err: any) {
       res.json({ ok: false, error: err?.message || 'API connection failed' });
     }
+  };
+  app.post('/api/ai/test', testHandler);
+  app.get('/api/ai/test', testHandler);
+
+  // Status/info for GET requests on /api/ai/generate to prevent 404
+  app.get('/api/ai/generate', (_req, res) => {
+    res.json({ 
+      status: 'ready', 
+      endpoint: '/api/ai/generate',
+      method: 'POST',
+      message: 'TeachBuddy AI Generation Endpoint is Active'
+    });
   });
 
   // API AI proxy route
   app.post('/api/ai/generate', async (req, res) => {
     try {
       const { prompt, systemInstruction, temperature, apiKey: customKey, model: requestedModel } = req.body || {};
-      const rawKey = customKey ? customKey.trim() : '';
+      const rawKey = cleanKey(customKey);
       const primaryKey = rawKey || process.env.GEMINI_API_KEY;
 
       if (!primaryKey) {
@@ -86,7 +134,14 @@ async function startServer() {
       // Helper to call Gemini with resilient fallback
       const generateWithGemini = async (key: string, modelChoice?: string): Promise<string> => {
         const ai = new GoogleGenAI({ apiKey: key });
-        const candidateModels = [modelChoice || 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+        const candidateModels = [
+          modelChoice,
+          'gemini-2.5-flash',
+          'gemini-3.6-flash',
+          'gemini-flash-latest',
+          'gemini-3.1-flash-lite',
+        ].filter(Boolean) as string[];
+
         let lastErr: any = null;
         for (const m of candidateModels) {
           try {

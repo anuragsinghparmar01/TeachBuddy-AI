@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Key, Sparkles, CheckCircle2, ExternalLink, X, ShieldAlert, Cpu, Check } from 'lucide-react';
 import type { UserProfile } from '../types';
 import { audioService } from '../services/audioService';
+import { setMasterApiKey, cleanApiKey, getStoredMasterApiKey } from '../services/aiService';
 
 interface GeminiKeyModalProps {
   isOpen: boolean;
@@ -16,45 +17,86 @@ export const GeminiKeyModal: React.FC<GeminiKeyModalProps> = ({
   user,
   onUpdateUser,
 }) => {
-  const [apiKey, setApiKey] = useState(user.geminiApiKey || localStorage.getItem('teachbuddy_gemini_key') || '');
+  const [apiKey, setApiKey] = useState(user.geminiApiKey || getStoredMasterApiKey() || '');
   const [isTesting, setIsTesting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   if (!isOpen) return null;
 
   const handleSaveKey = async () => {
-    const trimmed = apiKey.trim();
+    const trimmed = cleanApiKey(apiKey);
     setIsTesting(true);
     setStatusMessage(null);
 
     try {
-      // Test key with a minimal call
-      const res = await fetch('/api/ai/generate', {
+      if (!trimmed) {
+        setMasterApiKey('');
+        onUpdateUser({ geminiApiKey: undefined, customApiKey: undefined });
+        setStatusMessage({ type: 'success', text: 'Reset to default built-in AI server connection.' });
+        audioService.playSound('success');
+        return;
+      }
+
+      // Test key with /api/ai/test
+      const res = await fetch('/api/ai/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: 'Respond with "Ready" in one word.',
-          apiKey: trimmed || undefined,
-        }),
+        body: JSON.stringify({ apiKey: trimmed }),
       });
 
-      if (res.ok) {
-        if (trimmed) {
-          localStorage.setItem('teachbuddy_gemini_key', trimmed);
-          onUpdateUser({ geminiApiKey: trimmed });
-          setStatusMessage({ type: 'success', text: 'Gemini Free API Key connected & verified successfully!' });
-        } else {
-          localStorage.removeItem('teachbuddy_gemini_key');
-          onUpdateUser({ geminiApiKey: undefined });
-          setStatusMessage({ type: 'success', text: 'Reset to default built-in AI server connection.' });
-        }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        setMasterApiKey(trimmed);
+        onUpdateUser({ geminiApiKey: trimmed, customApiKey: trimmed });
+        setStatusMessage({ 
+          type: 'success', 
+          text: `Verified & Connected to ${data.provider || 'Google Gemini'} (${data.model || 'Flash'}) successfully!` 
+        });
         audioService.playSound('success');
       } else {
-        const data = await res.json();
-        setStatusMessage({ type: 'error', text: data.error || 'Invalid API key. Please check from Google AI Studio.' });
-        audioService.playSound('pop');
+        // Try fallback check on /api/ai/generate
+        const genRes = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: 'Say OK',
+            apiKey: trimmed,
+          }),
+        });
+        const genData = await genRes.json().catch(() => ({}));
+        if (genRes.ok && genData.text) {
+          setMasterApiKey(trimmed);
+          onUpdateUser({ geminiApiKey: trimmed, customApiKey: trimmed });
+          setStatusMessage({ type: 'success', text: 'Gemini Free API Key connected & verified successfully!' });
+          audioService.playSound('success');
+        } else {
+          setStatusMessage({ 
+            type: 'error', 
+            text: data.error || genData.error || 'Invalid API key or quota exceeded. Please check Google AI Studio.' 
+          });
+          audioService.playSound('pop');
+        }
       }
     } catch (e: any) {
+      // Direct REST fallback check
+      try {
+        const directRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${trimmed}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: 'OK' }] }] }),
+          }
+        );
+        if (directRes.ok) {
+          setMasterApiKey(trimmed);
+          onUpdateUser({ geminiApiKey: trimmed, customApiKey: trimmed });
+          setStatusMessage({ type: 'success', text: 'Connected & verified directly with Google Gemini API!' });
+          audioService.playSound('success');
+          return;
+        }
+      } catch {}
+
       setStatusMessage({ type: 'error', text: e.message || 'Verification connection error' });
     } finally {
       setIsTesting(false);
