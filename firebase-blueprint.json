@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with study settings and achievements",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User identifier" },
+        "name": { "type": "string", "description": "Student full name" },
+        "email": { "type": "string", "description": "Email address" },
+        "role": { "type": "string", "description": "User role: student or admin" },
+        "xp": { "type": "number", "description": "Total XP points" },
+        "level": { "type": "number", "description": "Student level" },
+        "streakDays": { "type": "number", "description": "Current streak count" }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "Smart study notes generated for students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Note unique ID" },
+        "topic": { "type": "string", "description": "Topic name" },
+        "chapter": { "type": "string", "description": "Chapter name" },
+        "subject": { "type": "string", "description": "Subject name" },
+        "content": { "type": "string", "description": "Note markdown content" }
+      },
+      "required": ["id", "topic", "content"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Quiz completion summary record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Quiz result ID" },
+        "topic": { "type": "string", "description": "Topic tested" },
+        "score": { "type": "number", "description": "User score" },
+        "total": { "type": "number", "description": "Total questions" },
+        "date": { "type": "string", "description": "ISO date string" }
+      },
+      "required": ["id", "topic", "score", "total"]
+    },
+    "StudySchedule": {
+      "title": "StudySchedule",
+      "description": "Personalized study timetable and tasks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Schedule ID" },
+        "goal": { "type": "string", "description": "Goal or exam title" },
+        "examDate": { "type": "string", "description": "Target exam date" }
+      },
+      "required": ["id", "goal"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "Global application configuration settings",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string", "description": "Application display name" },
+        "announcementBanner": { "type": "string", "description": "Global announcement text" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user profile and learning state"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "StudyNote",
+      "description": "Student private notes collection"
+    },
+    "/users/{userId}/quizzes/{quizId}": {
+      "schema": "QuizResult",
+      "description": "Student quiz results history"
+    },
+    "/users/{userId}/schedules/{scheduleId}": {
+      "schema": "StudySchedule",
+      "description": "Student study timetables"
+    },
+    "/settings/global_config": {
+      "schema": "AdminSettings",
+      "description": "Global application configuration"
+    }
+  }
+}

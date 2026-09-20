@@ -1,0 +1,6 @@
+{
+  "name": "TeachBuddy AI",
+  "description": "TeachBuddy AI - Learn, Grow, Together. The ultimate interactive AI study companion with human-like voice calls, daily streaks, 60s brain sprint challenge, mystery chests, step-by-step problem solver, smart revision notes, and PDF exports.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
