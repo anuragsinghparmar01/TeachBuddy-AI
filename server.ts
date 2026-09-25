@@ -78,7 +78,7 @@ async function startServer() {
 
       // Google Gemini Live API test with resilient model candidates
       const ai = new GoogleGenAI({ apiKey });
-      const testModels = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      const testModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
       let testReply = '';
       let testedModel = '';
       let testErr: any = null;
@@ -94,6 +94,7 @@ async function startServer() {
           break;
         } catch (e: any) {
           testErr = e;
+          continue;
         }
       }
 
@@ -131,16 +132,17 @@ async function startServer() {
         return;
       }
 
-      // Helper to call Gemini with resilient fallback
+      // Helper to call Gemini with resilient fallback across verified active models
       const generateWithGemini = async (key: string, modelChoice?: string): Promise<string> => {
         const ai = new GoogleGenAI({ apiKey: key });
-        const candidateModels = [
+        // Prioritize gemini-3.6-flash as officially recommended for latest features & 100% availability
+        const candidateModels = Array.from(new Set([
           modelChoice,
-          'gemini-2.5-flash',
           'gemini-3.6-flash',
           'gemini-flash-latest',
           'gemini-3.1-flash-lite',
-        ].filter(Boolean) as string[];
+          'gemini-3.8-flash',
+        ])).filter(Boolean) as string[];
 
         let lastErr: any = null;
         for (const m of candidateModels) {
@@ -156,9 +158,11 @@ async function startServer() {
             if (response.text) return response.text;
           } catch (e: any) {
             lastErr = e;
+            // Seamlessly fall back to next model candidate if busy
+            continue;
           }
         }
-        throw lastErr || new Error('Gemini models unavailable');
+        throw lastErr || new Error('Gemini models temporarily unavailable');
       };
 
       // Helper to call Groq

@@ -1,13 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, ArrowRight, Shield, Zap, Activity } from 'lucide-react';
 
 interface OpeningAnimationProps {
-  onComplete: () => void;
+  onComplete?: () => void;
+  onFinish?: () => void;
 }
 
-export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }) => {
+export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, onFinish }) => {
   const [brandStage, setBrandStage] = useState(0);
   const [countdownSeconds, setCountdownSeconds] = useState(3);
+
+  const handleFinish = useCallback(() => {
+    if (typeof onComplete === 'function') {
+      onComplete();
+    } else if (typeof onFinish === 'function') {
+      onFinish();
+    }
+  }, [onComplete, onFinish]);
+
+  useEffect(() => {
+    if (countdownSeconds <= 0) {
+      handleFinish();
+    }
+  }, [countdownSeconds, handleFinish]);
 
   useEffect(() => {
     const t1 = setTimeout(() => setBrandStage(1), 150);
@@ -18,7 +33,6 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
       setCountdownSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          onComplete();
           return 0;
         }
         return prev - 1;
@@ -31,7 +45,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
       clearTimeout(t3);
       clearInterval(timer);
     };
-  }, [onComplete]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-4 sm:p-8 bg-slate-950 text-slate-100 select-none overflow-hidden animate-fadeIn">
@@ -49,7 +63,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
         </div>
 
         <button
-          onClick={onComplete}
+          onClick={handleFinish}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-white transition active:scale-95 cursor-pointer"
         >
           <span>Skip</span>
@@ -121,7 +135,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
           }`}
         >
           <button
-            onClick={onComplete}
+            onClick={handleFinish}
             className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition hover:scale-105 active:scale-95 cursor-pointer"
           >
             <span>Start Learning</span>

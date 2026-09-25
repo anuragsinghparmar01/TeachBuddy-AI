@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
+  initializeFirestore,
   getFirestore, 
+  setLogLevel,
   collection, 
   doc, 
   setDoc, 
@@ -42,13 +44,21 @@ let auth: Auth | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
 
 try {
+  // Silent log level ensures transient offline/reachability retries do not throw noisy console errors
+  setLogLevel('silent');
   app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  // Firestore instance with custom database ID
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  // Firestore instance with custom database ID and auto-detecting transport
+  try {
+    db = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    }, firebaseConfig.firestoreDatabaseId);
+  } catch {
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
 } catch (err) {
-  console.warn('Firebase initialization note:', err);
+  // Graceful offline fallback
 }
 
 export { db, auth, googleProvider };
@@ -219,13 +229,28 @@ export async function saveUserProfile(user: UserProfile): Promise<void> {
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   if (db && uid && auth?.currentUser && auth.currentUser.uid === uid) {
     try {
-      const userRef = doc(db, 'users', uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const data = snap.data() as UserProfile;
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data));
-        return data;
-      }
+      const fetchWithTimeout = new Promise<UserProfile | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 2500);
+        const userRef = doc(db!, 'users', uid);
+        getDoc(userRef)
+          .then((snap) => {
+            clearTimeout(timer);
+            if (snap.exists()) {
+              const data = snap.data() as UserProfile;
+              localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data));
+              resolve(data);
+            } else {
+              resolve(null);
+            }
+          })
+          .catch(() => {
+            clearTimeout(timer);
+            resolve(null);
+          });
+      });
+
+      const result = await fetchWithTimeout;
+      if (result) return result;
     } catch (e: any) {
       console.warn('Firestore getUserProfile notice:', e?.message || e);
     }
@@ -364,21 +389,36 @@ export function getLocalAdminSettings(): AdminSettings {
 export async function getAdminSettings(): Promise<AdminSettings> {
   if (db) {
     try {
-      const settingsRef = doc(db, 'settings', 'global_config');
-      const snap = await getDoc(settingsRef);
-      if (snap.exists()) {
-        const data = snap.data() as Partial<AdminSettings>;
-        const merged: AdminSettings = {
-          ...DEFAULT_ADMIN_SETTINGS,
-          ...data,
-          features: {
-            ...DEFAULT_ADMIN_SETTINGS.features,
-            ...(data?.features || {}),
-          },
-        };
-        localStorage.setItem(STORAGE_KEYS.ADMIN_SETTINGS, JSON.stringify(merged));
-        return merged;
-      }
+      const fetchWithTimeout = new Promise<AdminSettings | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 2500);
+        const settingsRef = doc(db!, 'settings', 'global_config');
+        getDoc(settingsRef)
+          .then((snap) => {
+            clearTimeout(timer);
+            if (snap.exists()) {
+              const data = snap.data() as Partial<AdminSettings>;
+              const merged: AdminSettings = {
+                ...DEFAULT_ADMIN_SETTINGS,
+                ...data,
+                features: {
+                  ...DEFAULT_ADMIN_SETTINGS.features,
+                  ...(data?.features || {}),
+                },
+              };
+              localStorage.setItem(STORAGE_KEYS.ADMIN_SETTINGS, JSON.stringify(merged));
+              resolve(merged);
+            } else {
+              resolve(null);
+            }
+          })
+          .catch(() => {
+            clearTimeout(timer);
+            resolve(null);
+          });
+      });
+
+      const result = await fetchWithTimeout;
+      if (result) return result;
     } catch (e) {
       console.warn('Firestore get admin settings notice:', e);
     }

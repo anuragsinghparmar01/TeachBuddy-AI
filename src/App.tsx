@@ -21,6 +21,13 @@ import { ProfileView } from './components/ProfileView';
 import { SettingsView } from './components/SettingsView';
 import { StreaksModule } from './components/StreaksModule';
 import { BrainSprintModule } from './components/BrainSprintModule';
+import { WhiteboardModule } from './components/WhiteboardModule';
+import { FocusModeModule } from './components/FocusModeModule';
+import { ExamPrepModule } from './components/ExamPrepModule';
+import { CounselingModule } from './components/CounselingModule';
+import { CoursesModule } from './components/CoursesModule';
+import { WritingDraftingModule } from './components/WritingDraftingModule';
+import { PersonalitySpeakingModule } from './components/PersonalitySpeakingModule';
 import { AiMascotWidget } from './components/AiMascotWidget';
 import { VoiceCallModal } from './components/VoiceCallModal';
 import { AuthModal } from './components/AuthModal';
@@ -101,52 +108,63 @@ export default function App() {
     setIsVoiceCallOpen(true);
   };
 
+  // Cross module navigation helper: Jump to quiz with a pre-filled topic
   const handleStartQuizForTopic = (topic: string) => {
     setCurrentTopicForModule(topic);
     setActiveTab('quiz');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle intro animation finish
-  const handleAnimationComplete = () => {
-    sessionStorage.setItem('teachbuddy_intro_seen', 'true');
-    setShowAnimation(false);
-  };
-
-  // Determine active font class
-  const getActiveFontClass = (): string => {
-    if (user.childMode) return 'font-fredoka';
-    switch (adminSettings?.activeFont) {
-      case 'Fredoka':
-        return 'font-fredoka';
-      case 'Plus Jakarta Sans':
-        return 'font-jakarta';
-      case 'Space Mono':
-        return 'font-mono-tech';
-      case 'Outfit':
+  // Font family class helper based on settings
+  const getActiveFontClass = () => {
+    switch (user.fontFamily) {
+      case 'dyslexic':
+        return 'font-dyslexic';
+      case 'serif':
+        return 'font-serif';
+      case 'mono':
+        return 'font-mono';
       default:
-        return 'font-outfit';
+        return 'font-sans';
     }
   };
 
   // STEP 1: Opening Animation
   if (showAnimation) {
+    const handleDismissIntro = () => {
+      sessionStorage.setItem('teachbuddy_intro_seen', 'true');
+      setShowAnimation(false);
+    };
+
     return (
-      <OpeningAnimation 
-        onComplete={handleAnimationComplete} 
-        theme={user.openingTheme || 'command_center'}
+      <OpeningAnimation
+        onComplete={handleDismissIntro}
+        onFinish={handleDismissIntro}
       />
     );
   }
 
-  // STEP 2: Authentication First Portal (if user not authenticated yet)
-  if (!user.isAuthenticated) {
+  // STEP 2: First-time Guest / Authentication Screen
+  if (!user.isAuthenticated && !sessionStorage.getItem('teachbuddy_guest_dismissed')) {
     return (
       <AuthPortal
-        onLoginSuccess={(authedUser) => {
-          handleUpdateUser(authedUser);
+        darkMode={darkMode}
+        onGuestContinue={(name) => {
+          sessionStorage.setItem('teachbuddy_guest_dismissed', 'true');
+          handleUpdateUser({
+            name: name || 'Student',
+            isAuthenticated: false,
+          });
         }}
-        onContinueAsGuest={() => {
-          handleUpdateUser({ isAuthenticated: true });
+        onLoginSuccess={(authedUser, isAdminLogin) => {
+          sessionStorage.setItem('teachbuddy_guest_dismissed', 'true');
+          handleUpdateUser({
+            ...authedUser,
+            isAuthenticated: true,
+          });
+          if (isAdminLogin) {
+            setIsAdminOpen(true);
+          }
         }}
       />
     );
@@ -164,13 +182,8 @@ export default function App() {
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         onOpenVoiceCall={() => handleOpenVoiceCall()}
-        onOpenAuthModal={() => setIsAuthOpen(true)}
-        onOpenAdminPanel={() => setIsAdminOpen(true)}
-        onLogout={() => {
-          handleUpdateUser({ isAuthenticated: false, email: '' });
-        }}
-        activeTab={activeTab}
-        onNavigate={(tab) => {
+        currentTab={activeTab}
+        onChangeTab={(tab) => {
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
@@ -194,6 +207,66 @@ export default function App() {
           <NotesModule
             user={user}
             darkMode={darkMode}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'whiteboard' && (
+          <WhiteboardModule
+            user={user}
+            darkMode={darkMode}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'focus' && (
+          <FocusModeModule
+            user={user}
+            darkMode={darkMode}
+            onUpdateUser={handleUpdateUser}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'exam' && (
+          <ExamPrepModule
+            user={user}
+            darkMode={darkMode}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+            onStartQuizForTopic={handleStartQuizForTopic}
+          />
+        )}
+
+        {activeTab === 'counsel' && (
+          <CounselingModule
+            user={user}
+            darkMode={darkMode}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'writing' && (
+          <WritingDraftingModule
+            user={user}
+            darkMode={darkMode}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'personality' && (
+          <PersonalitySpeakingModule
+            user={user}
+            darkMode={darkMode}
+            onUpdateUser={handleUpdateUser}
+            onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+          />
+        )}
+
+        {activeTab === 'courses' && (
+          <CoursesModule
+            user={user}
+            darkMode={darkMode}
+            onStartQuizForTopic={handleStartQuizForTopic}
             onOpenVoiceCallWithTopic={handleOpenVoiceCall}
           />
         )}
@@ -292,7 +365,7 @@ export default function App() {
         onOpenVoiceCallWithTopic={(topic) => handleOpenVoiceCall(topic)}
       />
 
-      {/* Floating Voice Call Shortcut (Positioned neatly beside Mascot) */}
+      {/* Floating Voice Call Shortcut */}
       {adminSettings?.features?.voiceCallEnabled && (
         <aside aria-label="Voice Tutor Call" className="fixed bottom-20 sm:bottom-6 right-22 sm:right-26 z-30 hidden sm:block">
           <button
@@ -310,42 +383,31 @@ export default function App() {
         </aside>
       )}
 
-      {/* Clean, Professional Footer */}
-      <footer className={`mt-auto border-t py-4 text-xs transition-colors mb-16 lg:mb-0 ${
-        darkMode ? 'bg-slate-950 border-slate-900 text-slate-500' : 'bg-white border-slate-200 text-slate-500'
+      {/* Sleek, Minimalist Bottom Footer with Rich Colors & No Dull Grey Clutter */}
+      <footer className={`mt-auto border-t py-3.5 text-xs transition-colors mb-16 lg:mb-0 ${
+        darkMode ? 'bg-slate-950/90 border-indigo-500/20 text-slate-300' : 'bg-white/95 border-indigo-100 text-slate-700'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-950 shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-5 h-5 rounded-lg overflow-hidden border border-indigo-500/30 bg-slate-950 shrink-0">
               <img src="/logo.png" alt="TeachBuddy AI" className="w-full h-full object-cover" />
             </div>
-            <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+            <span className="font-extrabold bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent text-xs">
               TeachBuddy AI
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Active
             </span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-400 text-xs">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className="hover:text-indigo-500 transition cursor-pointer"
-            >
-              Profile
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="hover:text-indigo-500 transition cursor-pointer"
-            >
-              Settings
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setActiveTab('streaks')}
-              className="hover:text-indigo-500 transition cursor-pointer"
-            >
-              Streaks
-            </button>
-          </div>
+          <a 
+            href="tel:9455109687"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 font-bold hover:scale-105 transition cursor-pointer"
+          >
+            <span>📜 Certification Hotline:</span>
+            <span className="font-black text-indigo-600 dark:text-indigo-400">📞 9455109687</span>
+          </a>
         </div>
       </footer>
 

@@ -49,7 +49,27 @@ export const INDIAN_LANGUAGES: IndianLanguageOption[] = [
   { code: 'ur-IN', name: 'Urdu', nativeName: 'اردو', flag: '🇮🇳', greeting: 'آداب! میں آپ کا TeachBuddy AI ساتھی ہوں۔' },
 ];
 
-export type ActiveTab = 'explain' | 'notes' | 'solver' | 'quiz' | 'schedule' | 'games' | 'profile' | 'settings' | 'teach' | 'dashboard' | 'quizzes' | 'challenge' | 'streaks';
+export type ActiveTab = 
+  | 'explain' 
+  | 'notes' 
+  | 'solver' 
+  | 'quiz' 
+  | 'exam' 
+  | 'counsel' 
+  | 'whiteboard' 
+  | 'focus'
+  | 'writing'
+  | 'personality'
+  | 'courses' 
+  | 'schedule' 
+  | 'games' 
+  | 'profile' 
+  | 'settings' 
+  | 'teach' 
+  | 'dashboard' 
+  | 'quizzes' 
+  | 'challenge' 
+  | 'streaks';
 
 export const ALL_SUBJECTS = [
   'Mathematics',
@@ -143,6 +163,8 @@ export interface UserProfile {
   bgAmbientSound?: 'off' | 'lofi' | 'rain' | 'library' | 'binaural';
   bgAmbientVolume?: number;
   soundEffectsEnabled?: boolean;
+  themeAccent?: 'indigo' | 'emerald' | 'amber' | 'fuchsia' | 'cyan';
+  appFont?: AppFont;
 }
 
 export interface QuizQuestion {

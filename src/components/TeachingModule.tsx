@@ -6,21 +6,18 @@ import {
   BookOpen, 
   Volume2, 
   VolumeX, 
-  ArrowRight, 
+  PhoneCall, 
   Bookmark, 
-  RefreshCw,
-  PhoneCall,
-  AlertCircle,
-  HelpCircle,
-  GraduationCap,
-  Layers,
+  RotateCcw,
   ChevronRight,
+  HelpCircle,
+  AlertCircle,
   Zap,
-  Flame
+  Target,
+  FileCheck,
+  Share2
 } from 'lucide-react';
-import { AiIcon } from './AiIcon';
 import type { UserProfile, AgeGroup } from '../types';
-import { ALL_SUBJECTS } from '../types';
 import { aiService } from '../services/aiService';
 import { audioService } from '../services/audioService';
 import { saveNoteToFirestore } from '../firebase';
@@ -38,101 +35,89 @@ interface TeachingModuleProps {
 export const TeachingModule: React.FC<TeachingModuleProps> = ({
   user,
   darkMode,
-  onStartQuizForTopic = (_topic: string) => {},
-  onSaveAsNote = (_topic: string, _content: string) => {},
-  onOpenVoiceCallWithTopic = (_topic: string) => {},
+  onStartQuizForTopic = (_t?: string) => {},
+  onSaveAsNote = (_t?: string, _c?: string) => {},
+  onOpenVoiceCallWithTopic = (_t?: string) => {},
   initialTopic,
 }) => {
-  const [topicInput, setTopicInput] = useState(initialTopic || '');
-  const [selectedSubject, setSelectedSubject] = useState<string>('Mathematics');
-  const [selectedAge, setSelectedAge] = useState<AgeGroup>(user.ageGroup || 'high_school');
+  const [topicInput, setTopicInput] = useState(initialTopic || 'Newton\'s Laws of Motion');
   const [isLoading, setIsLoading] = useState(false);
   const [isReadingAloud, setIsReadingAloud] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [lesson, setLesson] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'steps' | 'formulas' | 'quiz'>('overview');
+  
+  // Learning Mode: Comprehensive, ELI5 / Story, Exam High-Yield, Speed Revision
+  const [studyMode, setStudyMode] = useState<'standard' | 'eli5' | 'exam' | 'speed'>('standard');
+
+  // Pre-loaded popular basic questions that students frequently ask
+  const popularBasicQuestions = [
+    { label: "Newton's 3 Laws of Motion", icon: '⚛️', question: "Explain Newton's 3 laws of motion with daily life examples" },
+    { label: "How Photosynthesis Works", icon: '🌿', question: "How do plants convert sunlight into food and oxygen?" },
+    { label: "Pythagoras Theorem", icon: '📐', question: "Explain Pythagoras Theorem with simple visual analogy and formula" },
+    { label: "DNA & Genetics Basics", icon: '🧬', question: "What is DNA and how does it pass traits to children?" },
+    { label: "How Electricity Flows", icon: '⚡', question: "What is voltage, current and resistance in simple terms?" },
+    { label: "What is an Algorithm?", icon: '💻', question: "What is a computer algorithm and why is it like a cooking recipe?" },
+  ];
 
   useEffect(() => {
     if (initialTopic && initialTopic.trim()) {
       setTopicInput(initialTopic);
-      handleTeach(initialTopic);
+      handleTeach(initialTopic, studyMode);
+    } else if (!lesson) {
+      handleTeach("Newton's 3 Laws of Motion", studyMode);
     }
   }, [initialTopic]);
 
-  // Curated multi-subject quick prompts
-  const sampleTopicsBySubject: Record<string, { label: string; subject: string }[]> = {
-    Mathematics: [
-      { label: "Calculus: Product & Chain Rules", subject: "Mathematics" },
-      { label: "Matrix Determinants & Inverses", subject: "Mathematics" },
-      { label: "Pythagorean Theorem & Trigonometry", subject: "Mathematics" },
-    ],
-    Physics: [
-      { label: "Newton's Laws of Motion & Friction", subject: "Physics" },
-      { label: "Electromagnetic Induction & Faraday's Law", subject: "Physics" },
-      { label: "Quantum Photoelectric Effect", subject: "Physics" },
-    ],
-    Chemistry: [
-      { label: "Balancing Redox Reactions", subject: "Chemistry" },
-      { label: "Periodic Table Periodic Trends", subject: "Chemistry" },
-      { label: "Chemical Thermodynamics & Enthalpy", subject: "Chemistry" },
-    ],
-    Biology: [
-      { label: "Photosynthesis & Calvin Cycle", subject: "Biology" },
-      { label: "DNA Replication & Transcription", subject: "Biology" },
-      { label: "Human Circulatory & Heart System", subject: "Biology" },
-    ],
-    'Computer Science & AI': [
-      { label: "How Neural Networks Learn with Backprop", subject: "Computer Science & AI" },
-      { label: "Time Complexity & Big-O Notation", subject: "Computer Science & AI" },
-      { label: "Binary Search Trees & Recursion", subject: "Computer Science & AI" },
-    ],
-    'Economics & Commerce': [
-      { label: "Supply, Demand & Elasticity", subject: "Economics & Commerce" },
-      { label: "Fiscal Policy vs Monetary Policy", subject: "Economics & Commerce" },
-    ],
-  };
-
-  const currentSampleTopics = sampleTopicsBySubject[selectedSubject] || [
-    { label: `Core Principles of ${selectedSubject}`, subject: selectedSubject },
-    { label: `Practical Breakthrough Examples in ${selectedSubject}`, subject: selectedSubject },
-  ];
-
-  const handleTeach = async (topicToTeach?: string, overrideSubject?: string) => {
+  const handleTeach = async (topicToTeach?: string, modeOverride?: 'standard' | 'eli5' | 'exam' | 'speed') => {
     const topic = (topicToTeach || topicInput).trim();
     if (!topic) return;
 
-    const subjectToUse = overrideSubject || selectedSubject;
-
+    const currentMode = modeOverride || studyMode;
+    setTopicInput(topic);
     setIsLoading(true);
     setShowAnswer(false);
     setSavedSuccess(false);
     setErrorMessage(null);
     audioService.stopSpeaking();
     setIsReadingAloud(false);
-    setActiveTab('overview');
+
+    // Format topic prefix based on mode
+    let specializedPrompt = topic;
+    if (currentMode === 'eli5') {
+      specializedPrompt = `Explain like I am 5 years old using a bedtime story and simple everyday objects: ${topic}`;
+    } else if (currentMode === 'exam') {
+      specializedPrompt = `Exam high-yield focus with formulas, scoring keywords, derivations, and expected question marks: ${topic}`;
+    } else if (currentMode === 'speed') {
+      specializedPrompt = `Quick 30-second bullet point cheat-sheet and memory hooks: ${topic}`;
+    }
 
     try {
       const data = await aiService.teachTopic(
-        topic, 
-        selectedAge, 
+        specializedPrompt, 
+        user.ageGroup || 'high_school', 
         user.institution, 
         undefined, 
         user.preferredLanguage,
-        subjectToUse
+        'General Science & Math'
       );
       if (data && (data.title || data.explanation)) {
         setLesson(data);
       } else {
-        throw new Error("Unable to parse lesson response. Please try again.");
+        throw new Error("Unable to parse lesson. Please try again.");
       }
     } catch (err: any) {
       console.error("TeachTopic error:", err);
-      setErrorMessage(err?.message || "Failed to generate lesson. Please check your connection and retry.");
+      setErrorMessage(err?.message || "Failed to generate explanation. Please retry.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleModeChange = (mode: 'standard' | 'eli5' | 'exam' | 'speed') => {
+    setStudyMode(mode);
+    handleTeach(topicInput, mode);
   };
 
   const handleReadAloud = () => {
@@ -145,7 +130,7 @@ export const TeachingModule: React.FC<TeachingModuleProps> = ({
     if (!lesson) return;
 
     const textParts = [
-      `Lesson on ${lesson.title || topicInput}.`,
+      `Explanation for ${lesson.title || topicInput}.`,
       lesson.analogy ? `Everyday analogy: ${lesson.analogy}` : '',
       lesson.explanation || '',
       lesson.proTip ? `Pro Tip: ${lesson.proTip}` : ''
@@ -165,504 +150,318 @@ export const TeachingModule: React.FC<TeachingModuleProps> = ({
 
   const handleSaveNote = () => {
     if (!lesson) return;
-    const content = [
-      `# ${lesson.title || topicInput}`,
-      `**Subject**: ${selectedSubject} | **Level**: ${selectedAge}`,
-      lesson.analogy ? `\n### Everyday Analogy\n${lesson.analogy}` : '',
-      `\n### Core Explanation\n${lesson.explanation}`,
-      lesson.howToSteps && lesson.howToSteps.length > 0 ? `\n### Step-by-Step Procedure\n${lesson.howToSteps.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}` : '',
-      lesson.rulesOrFormulas && lesson.rulesOrFormulas.length > 0 ? `\n### Formulas & Laws\n${lesson.rulesOrFormulas.map((r: string) => `- ${r}`).join('\n')}` : '',
-      lesson.proTip ? `\n### Pro Tip\n${lesson.proTip}` : '',
-    ].filter(Boolean).join('\n');
-
     const noteToSave: any = {
-      id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `note-${Date.now()}`,
       topic: lesson.title || topicInput,
-      subject: selectedSubject,
-      chapter: 'AI Concept Lesson',
-      unit: 'Mastery',
-      ageGroup: selectedAge,
+      subject: 'Concept Mastery',
       summary: lesson.analogy || lesson.explanation?.slice(0, 160) || '',
-      bulletPoints: lesson.howToSteps && lesson.howToSteps.length > 0 ? lesson.howToSteps : [lesson.explanation?.slice(0, 200)],
-      formulasAndKeyTerms: (lesson.rulesOrFormulas || []).map((r: string) => ({ term: 'Rule / Formula', definition: r })),
-      mindmapOutline: [
-        { main: lesson.title || topicInput, subtopics: lesson.howToSteps?.slice(0, 3) || ['Concepts', 'Examples', 'Formulas'] }
-      ],
+      bulletPoints: lesson.howToSteps || [lesson.explanation?.slice(0, 200)],
+      formulasAndKeyTerms: (lesson.rulesOrFormulas || []).map((r: string) => ({ term: 'Rule/Formula', definition: r })),
       practiceQuestions: lesson.quickCheck ? [lesson.quickCheck.question] : [],
-      tags: [selectedSubject, 'Explain Lesson', 'TeachBuddy AI'],
       createdAt: new Date().toISOString(),
     };
 
-    saveNoteToFirestore(user.uid || 'guest', noteToSave);
-
-    onSaveAsNote(lesson.title || topicInput, content);
+    if (user.uid) {
+      saveNoteToFirestore(user.uid, noteToSave);
+    }
+    onSaveAsNote(lesson.title || topicInput, lesson.explanation);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* 1. CREATIVE HERO & COMMAND CENTER */}
-      <div className={`relative overflow-hidden rounded-3xl border transition-all duration-300 ${
+    <div className="max-w-4xl mx-auto space-y-4 animate-fadeIn">
+      {/* Search & Topic Prompt Bar with Vibrant Light Mode Styling */}
+      <div className={`p-4 sm:p-6 rounded-3xl border transition-all duration-300 ${
         darkMode 
-          ? 'bg-gradient-to-br from-[#0e1422] via-[#0b101c] to-[#080c14] border-slate-800/80 shadow-xl shadow-black/30' 
-          : 'bg-gradient-to-br from-white via-slate-50/80 to-indigo-50/40 border-slate-200/90 shadow-lg shadow-indigo-500/5'
+          ? 'bg-slate-900/90 border-slate-800 text-white shadow-xl shadow-black/20' 
+          : 'bg-gradient-to-br from-indigo-50/90 via-white to-violet-50/80 border-indigo-200/90 text-slate-900 shadow-xl shadow-indigo-500/5'
       }`}>
-        {/* Subtle Ambient Background Orbs */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-16 w-48 h-48 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            {/* Left: Dynamic Headings & Badges */}
-            <div className="space-y-3 max-w-2xl">
-              {/* Status Eyebrow Badge */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/25 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Gemini 3.6 Flash Active
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black tracking-tight font-outfit text-slate-900 dark:text-white">
+                  Interactive AI Tutor
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] border border-emerald-500/20">
+                  Concept Mastery
                 </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Zero-Lag Engine
-                </span>
-                {user.streakCount > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/20 text-xs font-bold text-amber-600 dark:text-amber-400">
-                    <Flame className="w-3.5 h-3.5 fill-amber-500" />
-                    {user.streakCount} Day Streak
-                  </span>
-                )}
               </div>
-
-              {/* Master Headline */}
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-                Master Any Concept with <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">Deep Intuition</span>
-              </h1>
-
-              {/* Inspiring Subtitle */}
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Break down complex topics into everyday analogies, visual step-by-step procedures, key formulas, and exam tips designed for your exact curriculum.
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                Ask any question or tap a popular concept below to learn step-by-step
               </p>
             </div>
-
-            {/* Right: Bespoke AI Icon + Quick Call Buddy Launcher */}
-            <div className="flex sm:flex-col items-center lg:items-end gap-3 shrink-0">
-              <div className="hidden sm:block">
-                <AiIcon size="lg" variant="gemini" glow={true} pulse={isLoading} />
-              </div>
-              
-              <button
-                onClick={() => onOpenVoiceCallWithTopic(topicInput || 'General Study Discussion')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer"
-              >
-                <PhoneCall className="w-4 h-4 fill-white/20" />
-                <span>Call Voice Buddy</span>
-              </button>
-            </div>
           </div>
 
-          {/* Academic Level & Configuration Controls Strip */}
-          <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-            {/* Level Selector */}
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 shadow-xs text-xs font-semibold">
-              <GraduationCap className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span className="text-slate-500 dark:text-slate-400">Target Level:</span>
-              <select
-                value={selectedAge}
-                onChange={(e) => setSelectedAge(e.target.value as AgeGroup)}
-                className="bg-transparent border-0 font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer text-xs"
-              >
-                <option value="child">Kids (Ages 6-10)</option>
-                <option value="middle_school">Middle School (11-13)</option>
-                <option value="high_school">High School (14-17)</option>
-                <option value="college">College / University</option>
-                <option value="competitive_exam">Competitive Exams (JEE / NEET / SAT)</option>
-                <option value="professional">Professional & Advanced</option>
-              </select>
-            </div>
-
-            {/* Language Pill */}
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <span>Language:</span>
-              <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 font-bold">
-                {user.preferredLanguage || 'en-IN'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. SUBJECT SELECTION STRIP */}
-      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-        darkMode ? 'bg-[#0e1422] border-slate-800/80' : 'bg-white border-slate-200/80 shadow-xs'
-      }`}>
-        <div className="flex items-center gap-2 mb-3">
-          <Layers className="w-4 h-4 text-indigo-500 shrink-0" />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Curriculum Subject:
-          </span>
-          <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-            {selectedSubject}
-          </span>
+          <button
+            onClick={() => onOpenVoiceCallWithTopic(topicInput)}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap self-start sm:self-center active:scale-95"
+          >
+            <PhoneCall className="w-3.5 h-3.5 fill-white/20 animate-pulse" />
+            <span>Live Voice Tutor</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {ALL_SUBJECTS.map((sub) => {
-            const isSelected = selectedSubject === sub;
+        {/* Learning Mode Switcher Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none mb-3">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 pr-1">
+            Study Mode:
+          </span>
+          {[
+            { id: 'standard' as const, label: 'Comprehensive', icon: BookOpen, color: 'indigo' },
+            { id: 'eli5' as const, label: 'ELI5 & Stories', icon: Lightbulb, color: 'amber' },
+            { id: 'exam' as const, label: 'Exam High-Yield', icon: Target, color: 'emerald' },
+            { id: 'speed' as const, label: '30s Speed Revision', icon: Zap, color: 'fuchsia' },
+          ].map((mode) => {
+            const Icon = mode.icon;
+            const isCurrent = studyMode === mode.id;
             return (
               <button
-                key={sub}
-                type="button"
-                onClick={() => setSelectedSubject(sub)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
-                  isSelected
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold shadow-md shadow-indigo-600/25 scale-[1.02]'
-                    : 'bg-slate-100/90 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                key={mode.id}
+                onClick={() => handleModeChange(mode.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer active:scale-95 ${
+                  isCurrent
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                    : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400'
                 }`}
               >
-                {sub}
+                <Icon className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-slate-400'}`} />
+                <span>{mode.label}</span>
               </button>
             );
           })}
         </div>
-      </div>
 
-      {/* 3. MASTER OMNIBOX & SEARCH BAR */}
-      <div className={`p-4 sm:p-6 rounded-3xl border transition-all ${
-        darkMode ? 'bg-[#0e1422] border-slate-800/80' : 'bg-white border-slate-200/80 shadow-md shadow-slate-200/40'
-      }`}>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={topicInput}
-              onChange={(e) => setTopicInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleTeach();
-              }}
-              placeholder={`Ask any question in ${selectedSubject}, e.g. "How does CRISPR gene editing work?" or "Derive Quadratic Formula"...`}
-              className="w-full px-4 py-3.5 pl-11 pr-24 rounded-2xl border text-xs sm:text-sm font-medium bg-slate-50/90 dark:bg-slate-950/70 border-slate-300/80 dark:border-slate-700/80 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-            />
-            <Sparkles className="w-5 h-5 text-indigo-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <span className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-              ↵ Enter
-            </span>
-          </div>
-
+        {/* Clean Search Input */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={topicInput}
+            onChange={(e) => setTopicInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleTeach()}
+            placeholder="Ask anything: e.g. Why is the sky blue? How does gravity work?..."
+            className="flex-1 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-indigo-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs text-slate-900 dark:text-white"
+          />
           <button
             onClick={() => handleTeach()}
             disabled={isLoading || !topicInput.trim()}
-            className="px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-md shadow-indigo-600/30 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 cursor-pointer whitespace-nowrap active:scale-95"
           >
-            {isLoading ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Explaining with AI...</span>
-              </>
-            ) : (
-              <>
-                <span>Explain Concept</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
+            <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{isLoading ? 'Explaining...' : 'Explain Concept'}</span>
           </button>
         </div>
 
-        {/* Curated Recommendations */}
-        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-slate-400 font-bold shrink-0 text-[11px] flex items-center gap-1">
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-            Quick Prompts:
-          </span>
-          {currentSampleTopics.map((t, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setSelectedSubject(t.subject);
-                handleTeach(t.label, t.subject);
-              }}
-              className="whitespace-nowrap px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 text-[11px] font-semibold border border-transparent hover:border-indigo-300/80 dark:hover:border-indigo-700/80 transition cursor-pointer"
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Preloaded 1-Click Basic Questions */}
+        <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+            Trending Study Concepts (Tap to learn):
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {popularBasicQuestions.map((q, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleTeach(q.question)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                  topicInput === q.question && lesson
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-transparent shadow-xs'
+                    : 'bg-white/90 dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-400 shadow-2xs'
+                }`}
+              >
+                <span>{q.icon}</span>
+                <span>{q.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Error Banner */}
+      {/* Error Alert */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-center gap-2.5">
+        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
           <button
             onClick={() => handleTeach()}
-            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            className="px-3 py-1 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-500 cursor-pointer"
           >
             Retry
           </button>
         </div>
       )}
 
-      {/* 4. STRUCTURED LESSON WORKSPACE */}
+      {/* Lesson View */}
       {lesson && (
-        <div className={`rounded-3xl border shadow-xl overflow-hidden animate-fadeIn transition-all ${
-          darkMode ? 'bg-[#0e1422] border-slate-800/80 text-white' : 'bg-white border-slate-200/90 text-slate-900'
-        }`}>
-          {/* Lesson Header Banner */}
-          <div className="p-6 sm:p-8 border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-extrabold uppercase tracking-wider">
-                    {selectedSubject} Mastery
-                  </span>
-                  <span className="text-xs text-slate-400">•</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    {user.preferredLanguage || 'English'}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  {lesson.title}
-                </h2>
-              </div>
+        <div className="space-y-4 animate-fadeIn">
+          {/* Action Row */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <h2 className="text-sm sm:text-base font-black font-outfit text-slate-900 dark:text-white">
+              {lesson.title || topicInput}
+            </h2>
 
-              {/* Action Toolbar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Voice Read Aloud with Animated Equalizer waves */}
-                <button
-                  onClick={handleReadAloud}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                    isReadingAloud
-                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {isReadingAloud ? (
-                    <>
-                      <div className="flex items-end gap-0.5 h-4">
-                        <span className="w-1 bg-white rounded-full animate-soundwave-1" />
-                        <span className="w-1 bg-white rounded-full animate-soundwave-2" />
-                        <span className="w-1 bg-white rounded-full animate-soundwave-3" />
-                      </div>
-                      <span>Pause Audio</span>
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="w-4 h-4 text-indigo-500" />
-                      <span>Listen Aloud</span>
-                    </>
-                  )}
-                </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleReadAloud}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer active:scale-95 ${
+                  isReadingAloud
+                    ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-400'
+                }`}
+              >
+                {isReadingAloud ? (
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-3 bg-white animate-soundwave-1 rounded-full" />
+                    <span className="w-1.5 h-4 bg-white animate-soundwave-2 rounded-full" />
+                    <span className="w-1.5 h-2 bg-white animate-soundwave-3 rounded-full" />
+                  </div>
+                ) : (
+                  <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
+                )}
+                <span>{isReadingAloud ? 'Speaking...' : 'Listen Aloud'}</span>
+              </button>
 
-                {/* Call Voice Tutor */}
-                <button
-                  onClick={() => onOpenVoiceCallWithTopic(lesson.title || topicInput)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-xs cursor-pointer"
-                >
-                  <PhoneCall className="w-3.5 h-3.5" />
-                  <span>Call Tutor</span>
-                </button>
+              <button
+                onClick={handleSaveNote}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer active:scale-95 flex items-center gap-1.5 ${
+                  savedSuccess
+                    ? 'bg-emerald-500 text-white border-emerald-500'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-400'
+                }`}
+              >
+                <Bookmark className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{savedSuccess ? 'Saved to Notes' : 'Save Note'}</span>
+              </button>
 
-                {/* Save Note */}
-                <button
-                  onClick={handleSaveNote}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                    savedSuccess
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Bookmark className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>{savedSuccess ? 'Saved to Notes!' : 'Save Note'}</span>
-                </button>
-
-                {/* Take Quiz */}
-                <button
-                  onClick={() => onStartQuizForTopic(lesson.title || topicInput)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 transition shadow-xs cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Quiz Me</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="flex items-center gap-2 mt-6 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-none -mb-6 sm:-mb-8">
-              {[
-                { id: 'overview', label: '1. Analogy & Intuition', icon: Lightbulb },
-                { id: 'steps', label: '2. Step-by-Step Procedure', icon: Layers },
-                { id: 'formulas', label: '3. Rules & Equations', icon: BookOpen },
-                { id: 'quiz', label: '4. Quick Check & Practice', icon: HelpCircle },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isTabActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-                      isTabActive
-                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-[#0e1422] rounded-t-xl shadow-xs'
-                        : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
+              <button
+                onClick={() => onStartQuizForTopic(lesson.title || topicInput)}
+                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/20 active:scale-95"
+              >
+                <span>Take Quiz</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
             </div>
           </div>
 
-          {/* Tab Content Body */}
-          <div className="p-6 sm:p-8 space-y-6">
-            {activeTab === 'overview' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* Real World Analogy Box */}
-                {lesson.analogy && (
-                  <div className="p-5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 text-base font-bold shadow-md shadow-indigo-600/30">
-                      💡
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-                        Everyday Intuition & Analogy
-                      </h4>
-                      <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 mt-1 leading-relaxed font-medium">
-                        {lesson.analogy}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Core Deep Explanation */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Comprehensive Conceptual Breakdown
-                  </h3>
-                  <div className="text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-line font-normal">
-                    {lesson.explanation}
-                  </div>
-                </div>
-
-                {/* Pro Tip */}
-                {lesson.proTip && (
-                  <div className="p-5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-start gap-3.5">
-                    <span className="text-2xl">🏆</span>
-                    <div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
-                        Exam Pro Tip & Mnemonic
-                      </span>
-                      <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-medium mt-0.5">
-                        {lesson.proTip}
-                      </p>
-                    </div>
-                  </div>
-                )}
+          {/* Everyday Analogy Card */}
+          {lesson.analogy && (
+            <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+              darkMode 
+                ? 'bg-slate-900/80 border-slate-800 text-white' 
+                : 'bg-gradient-to-br from-amber-50/70 via-white to-orange-50/50 border-amber-200 text-slate-900 shadow-md shadow-amber-500/5'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  Real-World Analogy & Mental Model
+                </span>
               </div>
-            )}
+              <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans font-medium">
+                {lesson.analogy}
+              </p>
+            </div>
+          )}
 
-            {activeTab === 'steps' && (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    How-To Step-by-Step Procedure
-                  </h3>
+          {/* Core Step-by-Step Breakdown */}
+          <div className={`p-6 rounded-3xl border ${
+            darkMode 
+              ? 'bg-slate-900/80 border-slate-800 text-white' 
+              : 'bg-white border-slate-200/90 text-slate-900 shadow-md shadow-slate-200/50'
+          }`}>
+            <div className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4" />
+              <span>Step-by-Step Explanation</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-line mb-4 font-normal">
+              {lesson.explanation}
+            </p>
+
+            {/* How-To Steps */}
+            {lesson.howToSteps && lesson.howToSteps.length > 0 && (
+              <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                  Sequential Application Steps:
                 </div>
-
-                {lesson.howToSteps && lesson.howToSteps.length > 0 ? (
-                  <div className="grid gap-3">
-                    {lesson.howToSteps.map((step: string, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex items-start gap-3.5"
-                      >
-                        <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                          {idx + 1}
-                        </span>
-                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
-                          {step}
-                        </p>
-                      </div>
-                    ))}
+                {lesson.howToSteps.map((step: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                    <span className="w-5 h-5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs shrink-0 mt-0.5 border border-indigo-200/60 dark:border-indigo-800">
+                      {idx + 1}
+                    </span>
+                    <span className="leading-snug">{step}</span>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500">No procedural steps provided for this topic.</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'formulas' && (
-              <div className="space-y-4 animate-fadeIn">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Governing Laws, Equations & Definitions
-                </h3>
-
-                {lesson.rulesOrFormulas && lesson.rulesOrFormulas.length > 0 ? (
-                  <div className="grid gap-2.5">
-                    {lesson.rulesOrFormulas.map((rule: string, i: number) => (
-                      <div 
-                        key={i}
-                        className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex items-center gap-3 text-xs sm:text-sm font-mono text-indigo-900 dark:text-indigo-200"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                        <span>{rule}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500">No specific mathematical equations or laws for this topic.</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'quiz' && (
-              <div className="space-y-4 animate-fadeIn">
-                {lesson.quickCheck ? (
-                  <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                        <HelpCircle className="w-4 h-4" /> Concept Check
-                      </span>
-                      <button
-                        onClick={() => setShowAnswer(!showAnswer)}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 underline cursor-pointer"
-                      >
-                        {showAnswer ? 'Hide Solution' : 'Reveal Solution'}
-                      </button>
-                    </div>
-
-                    <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
-                      {lesson.quickCheck.question}
-                    </p>
-
-                    {showAnswer && (
-                      <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs sm:text-sm text-emerald-900 dark:text-emerald-200 animate-fadeIn">
-                        <span className="font-bold mr-1.5">Verified Answer:</span>
-                        {lesson.quickCheck.answer}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500">No quick check question available.</p>
-                )}
-
-                <div className="pt-2 flex justify-end">
-                  <button
-                    onClick={() => onStartQuizForTopic(lesson.title || topicInput)}
-                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold transition shadow-md shadow-indigo-600/30 cursor-pointer"
-                  >
-                    <span>Launch 5-Question Quiz on This Topic</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+                ))}
               </div>
             )}
           </div>
+
+          {/* Formulas / Rules if any */}
+          {lesson.rulesOrFormulas && lesson.rulesOrFormulas.length > 0 && (
+            <div className={`p-5 rounded-3xl border ${
+              darkMode ? 'bg-slate-900/80 border-slate-800 text-white' : 'bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/40 border-indigo-200/80 text-slate-900 shadow-sm'
+            }`}>
+              <div className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4" />
+                <span>Governing Formulas & Scientific Laws</span>
+              </div>
+              <div className="space-y-2">
+                {lesson.rulesOrFormulas.map((rule: string, idx: number) => (
+                  <div key={idx} className="p-3 rounded-2xl bg-white dark:bg-slate-950 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-slate-800 shadow-2xs">
+                    {rule}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pro Tip */}
+          {lesson.proTip && (
+            <div className={`p-4 sm:p-5 rounded-2xl border ${
+              darkMode ? 'bg-slate-900/60 border-slate-800 text-white' : 'bg-emerald-50/60 border-emerald-200 text-slate-900 shadow-2xs'
+            }`}>
+              <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Exam Pro-Tip & High-Yield Mnemonic</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-medium">
+                {lesson.proTip}
+              </p>
+            </div>
+          )}
+
+          {/* Quick Concept Check Question */}
+          {lesson.quickCheck && (
+            <div className={`p-5 sm:p-6 rounded-3xl border ${
+              darkMode ? 'bg-slate-900/80 border-slate-800 text-white' : 'bg-gradient-to-br from-violet-50/70 via-white to-indigo-50/50 border-violet-200 text-slate-900 shadow-md shadow-violet-500/5'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <HelpCircle className="w-4 h-4 text-violet-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-violet-700 dark:text-violet-400">
+                  Concept Check Challenge
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mb-3">
+                {lesson.quickCheck.question}
+              </p>
+
+              {showAnswer ? (
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-900/60 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed animate-fadeIn">
+                  ✅ <strong className="text-emerald-600 dark:text-emerald-400 font-black">Answer:</strong> {lesson.quickCheck.answer}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAnswer(true)}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs transition cursor-pointer shadow-md shadow-violet-500/20 active:scale-95"
+                >
+                  Reveal Solution
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -274,6 +274,10 @@ class AudioService {
   }
 
   // ================= AMBIENT FOCUS AUDIO ENGINE (Web Audio API) =================
+  public playAmbientSound(type: 'lofi' | 'rain' | 'library' | 'binaural', volume = 0.25) {
+    this.startAmbientSound(type, volume);
+  }
+
   public startAmbientSound(type: 'lofi' | 'rain' | 'library' | 'binaural', volume = 0.25) {
     this.stopAmbientSound();
     const ctx = this.getAudioContext();

@@ -114,13 +114,13 @@ export default async function handler(req: IncomingMessage & { body?: any; query
       }
 
       const ai = new GoogleGenAI({ apiKey: primaryKey });
-      const candidateModels = [
+      const candidateModels = Array.from(new Set([
         requestedModel,
-        'gemini-2.5-flash',
         'gemini-3.6-flash',
         'gemini-flash-latest',
         'gemini-3.1-flash-lite',
-      ].filter(Boolean) as string[];
+        'gemini-3.8-flash',
+      ])).filter(Boolean) as string[];
 
       let generatedText = '';
       let lastErr: any = null;
@@ -141,6 +141,7 @@ export default async function handler(req: IncomingMessage & { body?: any; query
           }
         } catch (e: any) {
           lastErr = e;
+          continue;
         }
       }
 

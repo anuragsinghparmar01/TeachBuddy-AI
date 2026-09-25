@@ -136,20 +136,24 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Top Banner */}
-      <div className={`p-6 sm:p-8 rounded-3xl border transition-all ${
-        darkMode ? 'bg-[#0e1422] border-slate-800/80 text-white shadow-xl shadow-black/20' : 'bg-white border-slate-200/90 text-slate-900 shadow-md shadow-slate-200/50'
+      <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 ${
+        darkMode 
+          ? 'bg-[#0e1422] border-slate-800/80 text-white shadow-xl shadow-black/20' 
+          : 'bg-gradient-to-br from-amber-50/70 via-white to-orange-50/50 border-amber-200/90 text-slate-900 shadow-xl shadow-amber-500/5'
       }`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-amber-200/60 dark:border-slate-800/80 pb-5">
           <div className="flex items-center gap-4">
-            <AiIcon size="md" variant="cyber" glow={true} />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+              <Calculator className="w-6 h-6" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Step-by-Step Problem Solver</h1>
-                <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-[10px] font-extrabold border border-cyan-500/25">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight font-outfit">Step-by-Step Problem Solver</h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-black border border-amber-500/25">
                   Deep Verification
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 font-medium">
                 Exact mathematical derivations, scientific proofs, algorithmic code, and interactive scratchpad.
               </p>
             </div>
@@ -157,9 +161,9 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
 
           <button
             onClick={() => setShowScratchpad(!showScratchpad)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer shadow-xs active:scale-95"
           >
-            <PenTool className="w-3.5 h-3.5 text-cyan-500" />
+            <PenTool className="w-3.5 h-3.5 text-amber-500" />
             <span>{showScratchpad ? 'Hide Scratchpad' : 'Open Scratchpad'}</span>
           </button>
         </div>
@@ -191,51 +195,39 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
           </div>
         )}
 
-        {/* Form Inputs */}
+        {/* Universal Problem Input (No Rigid Subject Dropdown) */}
         <div className="mt-5 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="sm:w-1/4">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Subject
-              </label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {ALL_SUBJECTS.map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex-1">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Paste or Type Problem Statement
               </label>
-              <div className="relative">
-                <textarea
-                  value={problemText}
-                  onChange={(e) => setProblemText(e.target.value)}
-                  rows={3}
-                  placeholder="Paste any equation, word problem, calculus proof, or coding prompt here..."
-                  className="w-full px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none shadow-sm"
-                />
-              </div>
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                ✨ Auto-Detects Math, Physics, Chemistry, Code & Logic
+              </span>
+            </div>
+            <div className="relative">
+              <textarea
+                value={problemText}
+                onChange={(e) => setProblemText(e.target.value)}
+                rows={3}
+                placeholder="Paste any equation (e.g. ∫ x·sin(x) dx), word problem, kinematics calculation, chemical reaction, or coding prompt here..."
+                className="w-full px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none shadow-xs text-slate-900 dark:text-white transition"
+              />
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
             {/* Quick Samples Dropdown */}
-            <div className="flex items-center gap-2 overflow-x-auto text-xs py-1">
-              <span className="text-slate-400 font-bold shrink-0">Try:</span>
+            <div className="flex items-center gap-2 overflow-x-auto text-xs py-1 scrollbar-none">
+              <span className="text-slate-400 font-bold shrink-0 text-[11px]">Quick Try:</span>
               {sampleProblems.map((sp, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleSolve(sp.text, sp.subject)}
-                  className="whitespace-nowrap px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:border-indigo-400 transition"
+                  onClick={() => handleSolve(sp.text, 'Auto-detected')}
+                  className="whitespace-nowrap px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium hover:border-amber-400 dark:hover:border-amber-500 transition cursor-pointer shadow-2xs active:scale-95"
                 >
-                  {sp.label}
+                  <span>{sp.label}</span>
                 </button>
               ))}
             </div>
@@ -243,7 +235,7 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
             <button
               onClick={() => handleSolve()}
               disabled={isLoading || !problemText.trim()}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-md active:scale-95 shrink-0"
+              className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 shrink-0 cursor-pointer"
             >
               {isLoading ? (
                 <>
@@ -285,11 +277,12 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
           {/* Top Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                Verified Solution
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Verified Step-by-Step Solution
               </span>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {solution.subject} · Difficulty: {solution.difficulty}
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                Difficulty: {solution.difficulty}
               </h2>
             </div>
 

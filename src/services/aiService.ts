@@ -117,6 +117,131 @@ export function resolveEffectiveApiKey(options: GenerateOptions): string {
   return '';
 }
 
+// Repair invalid escapes inside JSON string literals (e.g. LaTeX \Sigma, \alpha, \vec, \frac, \text, or unescaped newlines)
+function repairJsonEscapes(jsonStr: string): string {
+  let result = '';
+  let inString = false;
+  let i = 0;
+  while (i < jsonStr.length) {
+    const ch = jsonStr[i];
+    // Check if quote character toggles string state (accounting for escaped quotes)
+    if (ch === '"' && (i === 0 || jsonStr[i - 1] !== '\\' || (i >= 2 && jsonStr[i - 2] === '\\' && jsonStr[i - 1] === '\\'))) {
+      inString = !inString;
+      result += ch;
+      i++;
+      continue;
+    }
+
+    if (inString && ch === '\\') {
+      const next = jsonStr[i + 1];
+      if (next === undefined) {
+        result += '\\\\';
+        i++;
+        continue;
+      }
+      
+      // If backslash is followed by backslash, quote, or forward slash: preserve standard escape
+      if (next === '"' || next === '\\' || next === '/') {
+        result += ch + next;
+        i += 2;
+        continue;
+      }
+
+      // Check for Unicode escape \uXXXX
+      if (next === 'u') {
+        const uCode = jsonStr.substring(i + 2, i + 6);
+        if (/^[0-9a-fA-F]{4}$/.test(uCode)) {
+          result += ch + next + uCode;
+          i += 6;
+          continue;
+        }
+      }
+
+      // Check standard 1-character JSON escapes: \b, \f, \n, \r, \t
+      if (next === 'b' || next === 'f' || next === 'n' || next === 'r' || next === 't') {
+        const afterNext = jsonStr[i + 2] || '';
+        // If followed by letters (e.g. \frac, \text, \times, \theta, \beta, \rho, \right), it is a LaTeX command, NOT a JSON escape!
+        if (/[a-zA-Z]/.test(afterNext)) {
+          result += '\\\\';
+          i++;
+          continue;
+        }
+        // Genuine single escape char in JSON
+        result += ch + next;
+        i += 2;
+        continue;
+      }
+
+      // Any other backslash in a string literal (e.g. \Sigma, \vec, \alpha, \Delta, \cdot, \$, \(, \)):
+      // Double the backslash so JSON.parse receives valid \\ resulting in literal \
+      result += '\\\\';
+      i++;
+      continue;
+    }
+
+    // Handle raw unescaped newlines/tabs inside string literals
+    if (inString && (ch === '\n' || ch === '\r' || ch === '\t')) {
+      if (ch === '\n') result += '\\n';
+      else if (ch === '\r') result += '\\r';
+      else if (ch === '\t') result += '\\t';
+      i++;
+      continue;
+    }
+
+    result += ch;
+    i++;
+  }
+  return result;
+}
+
+// Fallback regex extractor for topic explanations if JSON is severely malformed
+function attemptRegexObjectExtraction(raw: string): any {
+  try {
+    const obj: any = {};
+    const stringFieldKeys = ['title', 'analogy', 'explanation', 'proTip', 'overview', 'summary', 'code', 'answer', 'question', 'finalAnswer'];
+    for (const key of stringFieldKeys) {
+      const re = new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*?)(?:"\\s*,\\s*"|(?:"\\s*[\\]}]\\s*)|(?:"\\s*,\\s*[\\w"]+)|(?:"\\s*$))`);
+      const m = raw.match(re);
+      if (m && m[1]) {
+        obj[key] = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+    }
+
+    const arrayFieldKeys = ['howToSteps', 'rulesOrFormulas', 'steps', 'tips', 'keyTakeaways', 'options', 'givenData', 'conceptsUsed', 'practiceQuestions', 'bulletPoints'];
+    for (const key of arrayFieldKeys) {
+      const arrayRe = new RegExp(`"${key}"\\s*:\\s*\\[([\\s\\S]*?)\\]`);
+      const arrMatch = raw.match(arrayRe);
+      if (arrMatch && arrMatch[1]) {
+        const items = arrMatch[1].match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g);
+        if (items) {
+          obj[key] = items.map((it) => {
+            const stripped = it.replace(/^"|"$/g, '');
+            return stripped.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+          });
+        }
+      }
+    }
+
+    // Extract quickCheck object if present
+    const qcMatch = raw.match(/"quickCheck"\s*:\s*\{([\s\S]*?)\}/);
+    if (qcMatch && qcMatch[1]) {
+      const qMatch = qcMatch[1].match(/"question"\s*:\s*"([\s\S]*?)"/);
+      const aMatch = qcMatch[1].match(/"answer"\s*:\s*"([\s\S]*?)"/);
+      if (qMatch && aMatch) {
+        obj.quickCheck = {
+          question: qMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
+          answer: aMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
+        };
+      }
+    }
+
+    if (obj.title || obj.explanation || obj.analogy || obj.finalAnswer) {
+      return obj;
+    }
+  } catch {}
+  return null;
+}
+
 // Extract JSON safely from Gemini / Groq responses
 function extractJson<T = any>(rawText: string): T {
   if (!rawText || typeof rawText !== 'string') {
@@ -156,18 +281,28 @@ function extractJson<T = any>(rawText: string): T {
   // Remove trailing commas before closing braces/brackets
   cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
 
+  // Stage 1: Standard parse
   try {
     return JSON.parse(cleaned) as T;
-  } catch (initialErr) {
-    // Attempt sanitizing raw unescaped newlines in string values
+  } catch {
+    // Stage 2: Escape repair (fixes LaTeX \Sigma, \frac, \vec, \alpha, unescaped newlines)
     try {
-      const sanitized = cleaned.replace(/"((?:\\.|[^"\\])*)"/gs, (_, inner) => {
-        return '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
-      });
-      return JSON.parse(sanitized) as T;
+      const repaired = repairJsonEscapes(cleaned);
+      return JSON.parse(repaired) as T;
     } catch {
-      console.error('JSON Parse Error on Live AI response:', initialErr, '\nRaw text:\n', rawText);
-      throw new Error(`Failed to parse structured response from Live AI API. Please try asking again.`);
+      // Stage 3: Secondary pass with aggressive comma & control character cleaning
+      try {
+        const sanitized = repairJsonEscapes(cleaned.replace(/,\s*([}\]])/g, '$1'));
+        return JSON.parse(sanitized) as T;
+      } catch (err) {
+        // Stage 4: Regex-based object extraction
+        const fallback = attemptRegexObjectExtraction(cleaned);
+        if (fallback && (fallback.title || fallback.explanation || fallback.analogy)) {
+          return fallback as T;
+        }
+        console.error('JSON Parse Error on Live AI response:', err, '\nRaw text:\n', rawText);
+        throw new Error(`Failed to parse structured response from Live AI API. Please try asking again.`);
+      }
     }
   }
 }
@@ -177,7 +312,7 @@ async function directGeminiRestCall(apiKey: string, prompt: string, systemInstru
   const cleanedKey = cleanApiKey(apiKey);
   if (!cleanedKey) throw new Error('Cannot make direct AI call without an API key.');
 
-  const models = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
   let lastErr: any = null;
 
   for (const model of models) {
@@ -352,7 +487,7 @@ Output strictly valid JSON (no markdown formatting outside the JSON):
 
     const raw = await callAiBackend({
       prompt,
-      systemInstruction: 'You are TeachBuddy AI. Output valid JSON only without enclosing markdown or extra commentary.',
+      systemInstruction: 'You are TeachBuddy AI. Output valid JSON only without enclosing markdown or extra commentary. Always double-escape backslashes in LaTeX formulas (e.g. \\\\frac, \\\\Sigma, \\\\vec).',
       temperature: 0.5,
       moduleKey: 'explainKey',
     });
@@ -577,28 +712,32 @@ Output strictly valid JSON:
     ageGroup: AgeGroup = 'high_school',
     studentName: string = 'Friend',
     languageCode: IndianLanguageCode = 'en-US',
-    customName?: string
+    customName?: string,
+    subjectContext?: string,
+    toneStyle?: string
   ): Promise<string> {
     const langObj = INDIAN_LANGUAGES.find(l => l.code === languageCode) || INDIAN_LANGUAGES[0];
     const historyText = conversationHistory.slice(-6).map(m => `${m.sender === 'user' ? 'Student' : 'Buddy'}: ${m.text}`).join('\n');
     
-    const tutorName = customName || 'TeachBuddy';
-    const prompt = `You are ${tutorName}, an expert, encouraging study tutor talking live on a voice call with ${studentName}.
-Language: Respond in ${langObj.name} (${langObj.nativeName}) with natural, conversational spoken clarity.
-Student Level: ${ageGroup}.
+    const tutorName = customName || (gender === 'female' ? 'Aditi' : 'Rishi');
+    const prompt = `You are ${tutorName}, a top Indian academic tutor speaking live over a voice call with student ${studentName}.
+Language: Speak naturally in ${langObj.name} (${langObj.nativeName}).
+Student Grade / Level: ${ageGroup}.
+Subject Specialization: ${subjectContext || 'General STEM & Academic Sciences'}.
+Voice Tone & Personality: ${toneStyle || 'Encouraging, crystal-clear, relatable mentor'}.
 
-Recent Conversation:
+Recent Call Conversation:
 ${historyText}
-Student just said: "${userMessage}"
+Student just asked/said: "${userMessage}"
 
-CRITICAL VOICE INSTRUCTIONS:
-1. ACCURATE LIVE ANSWER: Explain the concept or solve the question with 100% factual accuracy in 2 to 3 spoken sentences.
-2. INTERACTIVE ENGAGEMENT: End your answer with a friendly follow-up question checking their understanding.
-3. SPOKEN-FRIENDLY: Do NOT use markdown symbols, asterisks, bullet points, or complex math notation that cannot be spoken out loud. Keep tone warm, clear, and encouraging.`;
+CRITICAL SPOKEN VOICE RULES:
+1. FACTUAL ACCURACY: Give a completely correct, intuitive explanation in 2 to 3 spoken sentences.
+2. NATURAL HUMAN CADENCE: Talk like a real conversational mentor. No markdown asterisks, no bullet lists, no formulas that can't be spoken aloud.
+3. SOCRATIC FOLLOW-UP: Always conclude with an engaging, short 1-sentence question to verify the student understood or ask what step they'd like to explore next.`;
 
     const raw = await callAiBackend({ 
       prompt, 
-      systemInstruction: 'You are a warm, articulate voice tutor. Speak naturally without formatting symbols.',
+      systemInstruction: 'You are an authentic, encouraging voice tutor. Speak naturally with clear conversational cadence, zero markdown symbols.',
       temperature: 0.65,
       moduleKey: 'voiceKey',
     });
@@ -690,6 +829,149 @@ Please provide a helpful, encouraging explanation with key insights:`;
       temperature: 0.5,
       moduleKey: 'generalKey',
     });
+  },
+
+  // 10. GENERAL GENERATE CONTENT
+  async generateContent(options: { prompt: string; systemInstruction?: string; temperature?: number }): Promise<{ text: string }> {
+    const text = await callAiBackend({
+      prompt: options.prompt,
+      systemInstruction: options.systemInstruction || 'You are TeachBuddy AI. Output helpful, clean responses.',
+      temperature: options.temperature ?? 0.5,
+      moduleKey: 'generalKey',
+    });
+    return { text };
+  },
+
+  // 11. ADVANCED WRITING & LEGAL/OFFICIAL DRAFTING ENGINE
+  async generateDocumentDraft(params: {
+    category: string;
+    docType: string;
+    title: string;
+    sender: string;
+    recipient: string;
+    purpose: string;
+    keyDetails: string;
+    tone: string;
+    languageCode?: IndianLanguageCode;
+  }): Promise<{
+    formattedContent: string;
+    subjectLine: string;
+    keyClauses: string[];
+    legalOrOfficialTips: string[];
+  }> {
+    const lang = params.languageCode || 'en-US';
+    const langObj = INDIAN_LANGUAGES.find(l => l.code === lang) || INDIAN_LANGUAGES[0];
+
+    const prompt = `You are an elite legal draftsman, corporate communications director, and academic writing master.
+Generate an impeccable, publication-ready, complete document based on the following specifications:
+
+Category: ${params.category}
+Document Type: ${params.docType}
+Working Title: ${params.title || params.docType}
+Sender / Drafter / Issuer: ${params.sender || 'Applicant / Author'}
+Recipient / Authority / Beneficiary / Addressee: ${params.recipient || 'Concerned Authority / Recipient'}
+Core Purpose / Ground: ${params.purpose}
+Specific Facts / Dates / Figures / Terms: ${params.keyDetails || 'Standard industry/official terms'}
+Tone: ${params.tone}
+Language: ${langObj.name} (${langObj.nativeName})
+
+STANDARDS & INSTRUCTIONS:
+1. Include all official standard headers, reference numbers, date placeholders, formal salutations, recitals/clauses, standard terms, and signature blocks.
+2. For Legal Notices, Trust Deeds, Rent Agreements, Affidavits, and Powers of Attorney: Use authentic statutory phraseology (e.g., "WHEREAS", "NOW THIS DEED WITNESSETH", "IN WITNESS WHEREOF"), numbered clauses, dispute resolution jurisdiction, and execution witness blocks.
+3. For Applications, Letters, and Notices: Maintain standard academic/administrative layout (From, To, Date, Subject, Sir/Madam, structured body paragraphs, Thanking You, Yours faithfully/sincerely, Enclosures/Copy to).
+4. For Emails: Include a high-converting or standard formal Subject line, professional greeting, clean paragraph breaks, and formal sign-off.
+
+Output strictly valid JSON with no extraneous text:
+{
+  "subjectLine": "Exact formal subject line or title",
+  "formattedContent": "Full complete formatted text with line breaks (\\n) and standard layout",
+  "keyClauses": ["Key point or clause 1", "Key point or clause 2", "Key point or clause 3"],
+  "legalOrOfficialTips": ["Formatting or statutory tip 1 (e.g. stamp duty / registered post)", "Tip 2", "Tip 3"]
+}`;
+
+    const raw = await callAiBackend({
+      prompt,
+      systemInstruction: 'You are an expert legal and corporate drafting engine. Output strictly valid JSON.',
+      temperature: 0.35,
+      moduleKey: 'notesKey',
+    });
+
+    try {
+      const parsed = extractJson(raw);
+      if (parsed && parsed.formattedContent) {
+        return parsed;
+      }
+    } catch {}
+
+    return {
+      subjectLine: `${params.docType}: ${params.title || params.purpose}`,
+      formattedContent: raw.replace(/^```json\s*|\s*```$/g, '').trim(),
+      keyClauses: ['Standard verification and jurisdiction apply', 'Review dates and personal identifiers before submission'],
+      legalOrOfficialTips: ['Verify local stamp act requirements if applicable', 'Keep an acknowledged or registered copy for your records'],
+    };
+  },
+
+  // 12. SPEECH, PRESENTATION & CHARISMA COACH
+  async analyzeSpeechOrPitch(params: {
+    speechText: string;
+    context: string;
+    topic: string;
+    targetAudience: string;
+  }): Promise<{
+    overallScore: number;
+    toneAnalysis: string;
+    deliveryTips: {
+      bodyLanguage: string;
+      voiceModulation: string;
+      pacing: string;
+    };
+    fillerWordAlerts: string[];
+    strengths: string[];
+    improvements: string[];
+    suggestedHook: string;
+    polishedExcerpt: string;
+  }> {
+    const prompt = `You are a world-class TED speaker, executive speechwriter, and charisma coach.
+Analyze the following speech, presentation pitch, or spoken monologue:
+
+Topic: ${params.topic}
+Context / Setting: ${params.context}
+Target Audience: ${params.targetAudience}
+Speech / Pitch Transcript:
+"""
+${params.speechText}
+"""
+
+Evaluate this speech for:
+1. Audience Engagement & The 30-Second Hook
+2. Structure & Persuasiveness (Ethos, Pathos, Logos)
+3. Spoken Rhythm, Strategic Pauses & Elimination of Filler Words
+4. Body Language & Stage Presence cues tailored to this exact script
+
+Output strictly a valid JSON object:
+{
+  "overallScore": 88,
+  "toneAnalysis": "Concise summary of current tone and impression (e.g. Confident yet slightly rushed)",
+  "deliveryTips": {
+    "bodyLanguage": "Concrete physical posture, hand gesture, or eye contact technique to use for this speech",
+    "voiceModulation": "Where to lower pitch, emphasize words, or insert dramatic pauses",
+    "pacing": "Target speaking speed (e.g. 130-145 WPM) and breathing cues"
+  },
+  "fillerWordAlerts": ["Identified weak phrases or filler patterns like 'um', 'basically', 'you know'"],
+  "strengths": ["Top strength 1", "Top strength 2"],
+  "improvements": ["Key structural or rhetorical upgrade 1", "Key upgrade 2"],
+  "suggestedHook": "A high-impact 1-2 sentence alternative opening hook to grab audience attention instantly",
+  "polishedExcerpt": "A charismatic, rewritten 2-3 sentence power version of their central argument"
+}`;
+
+    const raw = await callAiBackend({
+      prompt,
+      systemInstruction: 'You are a master presentation and charisma evaluator. Output strictly a valid JSON object.',
+      temperature: 0.45,
+      moduleKey: 'voiceKey',
+    });
+
+    return extractJson(raw);
   },
 };
 

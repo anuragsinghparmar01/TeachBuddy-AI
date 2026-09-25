@@ -7,30 +7,18 @@ import {
   Award, 
   RotateCcw, 
   ArrowRight, 
-  Flame, 
   Timer, 
-  ChevronRight,
-  Bookmark,
-  Share2,
-  Trophy,
-  RefreshCw,
-  Download,
-  Zap,
-  BookOpen,
-  Folder,
-  Gauge,
-  Hash,
-  Target,
-  AlertCircle
+  Share2, 
+  Trophy, 
+  Download, 
+  AlertCircle,
+  Volume2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { QuizQuestion, QuizResult, UserProfile } from '../types';
-import { ALL_SUBJECTS } from '../types';
 import { aiService } from '../services/aiService';
-import { audioService } from '../services/audioService';
 import { saveQuizResultToFirestore, getLocalQuizzes } from '../firebase';
 import { exportQuizResultToPdf } from '../services/pdfService';
-import { AiIcon } from './AiIcon';
 
 interface QuizModuleProps {
   user: UserProfile;
@@ -45,15 +33,13 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
   darkMode,
   onUpdateUser,
   initialTopic,
-  onOpenVoiceCallWithTopic,
+  onOpenVoiceCallWithTopic = (_t?: string) => {},
 }) => {
   const [topic, setTopic] = useState(initialTopic || 'Calculus & Derivatives');
-  const [chapter, setChapter] = useState('Unit 1: Fundamentals');
   const [difficulty, setDifficulty] = useState('Medium');
-  const [questionCount, setQuestionCount] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Quiz State
+  // Active Quiz State
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -63,15 +49,19 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
   const [isQuizCompleted, setIsQuizCompleted] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [history, setHistory] = useState<QuizResult[]>([]);
-  const [reviewMode, setReviewMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    setHistory(getLocalQuizzes());
-  }, []);
+  // Pre-loaded popular basic quizzes for 1-click start
+  const preloadedQuizzes = [
+    { label: 'Calculus & Derivatives', icon: '📐', subject: 'Mathematics' },
+    { label: "Newton's Laws of Motion", icon: '⚛️', subject: 'Physics' },
+    { label: 'Mitosis vs Meiosis', icon: '🧬', subject: 'Biology' },
+    { label: 'Periodic Table & Bonding', icon: '🧪', subject: 'Chemistry' },
+    { label: 'Indian Constitution & Rights', icon: '📜', subject: 'Civics' },
+    { label: 'Python & Binary Logic', icon: '💻', subject: 'Computer' },
+  ];
 
-  // Timer while active
+  // Timer while quiz is active
   useEffect(() => {
     let interval: any;
     if (questions.length > 0 && !isQuizCompleted) {
@@ -82,32 +72,47 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
     return () => clearInterval(interval);
   }, [questions, isQuizCompleted]);
 
-  // If initialTopic changes
   useEffect(() => {
-    if (initialTopic) {
+    if (initialTopic && initialTopic.trim()) {
       setTopic(initialTopic);
+      handleGenerateQuiz(initialTopic);
     }
   }, [initialTopic]);
 
-  const handleGenerateQuiz = async () => {
-    if (!topic.trim()) return;
+  const handleGenerateQuiz = async (topicToUse?: string) => {
+    const finalTopic = topicToUse || topic;
+    if (!finalTopic.trim()) return;
+
+    setTopic(finalTopic);
     setIsLoading(true);
-    setIsQuizCompleted(false);
     setErrorMessage(null);
+    setIsQuizCompleted(false);
+    setQuestions([]);
     setCurrentIndex(0);
-    setSelectedOption(null);
-    setIsAnswerSubmitted(false);
     setUserAnswers([]);
     setScore(0);
+    setSelectedOption(null);
+    setIsAnswerSubmitted(false);
     setTimerSeconds(0);
-    setReviewMode(false);
+    setShowHint(false);
 
     try {
-      const generated = await aiService.generateQuiz(topic, chapter, difficulty, questionCount, user.preferredLanguage);
-      setQuestions(generated);
+      const generated = await aiService.generateQuiz(
+        finalTopic, 
+        'General', 
+        difficulty, 
+        5, 
+        user.preferredLanguage
+      );
+
+      if (generated && generated.length > 0) {
+        setQuestions(generated);
+      } else {
+        throw new Error('No questions returned');
+      }
     } catch (e: any) {
       console.error(e);
-      setErrorMessage(e?.message || 'Live Gemini API quiz generator failed. Please check connection.');
+      setErrorMessage(e?.message || 'Failed to generate quiz. Please retry.');
     } finally {
       setIsLoading(false);
     }
@@ -121,510 +126,300 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
   const handleSubmitAnswer = () => {
     if (selectedOption === null || isAnswerSubmitted) return;
 
+    setIsAnswerSubmitted(true);
     const currentQ = questions[currentIndex];
     const isCorrect = selectedOption === currentQ.correctIndex;
-
-    setIsAnswerSubmitted(true);
-    const updatedAnswers = [...userAnswers, selectedOption];
-    setUserAnswers(updatedAnswers);
 
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
+
+    setUserAnswers((prev) => [...prev, selectedOption]);
   };
 
-  const handleNextQuestion = () => {
-    if (currentIndex + 1 < questions.length) {
+  const handleNextQuestion = async () => {
+    if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setSelectedOption(null);
       setIsAnswerSubmitted(false);
       setShowHint(false);
     } else {
-      finishQuiz();
-    }
-  };
+      // Quiz Finished
+      setIsQuizCompleted(true);
+      const finalScore = score + (selectedOption === questions[currentIndex].correctIndex ? 1 : 0);
+      const percentage = Math.round((finalScore / questions.length) * 100);
 
-  const finishQuiz = async () => {
-    setIsQuizCompleted(true);
-    const finalScore = score + (selectedOption === questions[currentIndex]?.correctIndex ? 1 : 0);
-    const percentage = Math.round((finalScore / questions.length) * 100);
-    const xpReward = finalScore * 25 + (percentage >= 80 ? 50 : 20);
+      // Trigger Confetti for passing score
+      if (percentage >= 60) {
+        try {
+          confetti({ particleCount: 75, spread: 60, origin: { y: 0.6 } });
+        } catch {}
+      }
 
-    // Gamification celebrations
-    if (percentage >= 60) {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 },
+      // Award XP
+      const earnedXp = finalScore * 25 + 50;
+      onUpdateUser({
+        xp: (user.xp || 0) + earnedXp,
       });
+
+      // Save to Firebase
+      if (user.uid) {
+        const result: QuizResult = {
+          id: `quiz-${Date.now()}`,
+          topic,
+          score: finalScore,
+          totalQuestions: questions.length,
+          percentage,
+          xpEarned: earnedXp,
+          timestamp: new Date().toISOString(),
+          timeSpentSeconds: timerSeconds,
+          userAnswers: [...userAnswers, selectedOption || 0],
+        };
+        await saveQuizResultToFirestore(user.uid, result);
+      }
     }
-
-    const newXp = (user.xp || 0) + xpReward;
-    const newLevel = Math.floor(newXp / 200) + 1;
-    const newStreak = user.streakDays || 1;
-
-    onUpdateUser({
-      xp: newXp,
-      level: newLevel,
-      streakDays: newStreak,
-    });
-
-    const result: QuizResult = {
-      id: `quiz_${Date.now()}`,
-      topic,
-      chapter,
-      score: finalScore,
-      totalQuestions: questions.length,
-      percentage,
-      xpEarned: xpReward,
-      timestamp: new Date().toISOString(),
-      timeSpentSeconds: timerSeconds,
-      userAnswers: [...userAnswers, selectedOption ?? -1],
-    };
-
-    if (user.uid) {
-      await saveQuizResultToFirestore(user.uid, result);
-    }
-    setHistory(getLocalQuizzes());
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const currentQ = questions[currentIndex];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header & Config Panel */}
-      <div className={`p-6 sm:p-8 rounded-3xl border transition-all ${
-        darkMode ? 'bg-[#0e1422] border-slate-800/80 text-white shadow-xl shadow-black/20' : 'bg-white border-slate-200/90 text-slate-900 shadow-md shadow-slate-200/50'
+    <div className="max-w-4xl mx-auto space-y-4">
+      {/* Top Banner: Single Clean Search & Preloaded Chips */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+        darkMode 
+          ? 'bg-slate-900/90 border-slate-800 text-white shadow-xl shadow-black/20' 
+          : 'bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-pink-50/70 border-indigo-100 text-slate-900 shadow-md shadow-indigo-100/50'
       }`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-5">
-          <div className="flex items-center gap-4">
-            <AiIcon size="md" variant="mascot" glow={true} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/30 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Interactive Adaptive Quizzes</h1>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-extrabold border border-amber-500/25">
-                  Live AI Evaluator
+                <h1 className="text-base sm:text-lg font-black tracking-tight font-outfit">
+                  Instant Practice Quiz
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
+                  Adaptive MCQs
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Instant rationales, audio feedback, streak counters, and performance XP rewards.
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Test concepts with 5 high-yield multiple choice questions and instant explanations
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold px-3 py-1.5 rounded-full border border-amber-500/20 flex items-center gap-1.5 shadow-xs">
-              <Flame className="w-3.5 h-3.5 fill-amber-500" />
-              +25 XP per correct
-            </span>
+          {/* Difficulty Chips */}
+          <div className="flex items-center gap-1 self-start sm:self-center">
+            {['Easy', 'Medium', 'Hard'].map((diff) => (
+              <button
+                key={diff}
+                onClick={() => setDifficulty(diff)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  difficulty === diff
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
+                }`}
+              >
+                {diff}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Configuration Row */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-indigo-500" /> Subject / Topic
-            </label>
-            <input
-              type="text"
-              list="quiz-subjects-list"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Thermodynamics, Python, WWII"
-              className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <datalist id="quiz-subjects-list">
-              {ALL_SUBJECTS.map((sub) => (
-                <option key={sub} value={sub} />
-              ))}
-            </datalist>
+        {/* Single Topic Input */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleGenerateQuiz()}
+            placeholder="e.g. Calculus Derivatives, Indian Constitution..."
+            className="flex-1 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-xs text-slate-900 dark:text-white"
+          />
+          <button
+            onClick={() => handleGenerateQuiz()}
+            disabled={isLoading || !topic.trim()}
+            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md shadow-purple-500/25 cursor-pointer whitespace-nowrap"
+          >
+            <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{isLoading ? 'Creating 5 Questions...' : 'Start Quiz'}</span>
+          </button>
+        </div>
+
+        {/* Preloaded Quiz Chips */}
+        <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Loaded Basic Quizzes (Tap to start):
           </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Folder className="w-3.5 h-3.5 text-indigo-500" /> Chapter / Unit
-            </label>
-            <input
-              type="text"
-              value={chapter}
-              onChange={(e) => setChapter(e.target.value)}
-              placeholder="e.g. Chapter 4: Chemical Bonding"
-              className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Gauge className="w-3.5 h-3.5 text-indigo-500" /> Difficulty Standard
-            </label>
-            <select
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="Easy">Easy (Basics & Concepts)</option>
-              <option value="Medium">Medium (Exam Standard)</option>
-              <option value="Hard">Hard (Deep Challenge)</option>
-              <option value="Competitive Exam">Competitive Exam Level</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Hash className="w-3.5 h-3.5 text-indigo-500" /> Question Count
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={questionCount}
-                onChange={(e) => setQuestionCount(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value={3}>3 Questions (Quick Drill)</option>
-                <option value={5}>5 Questions (Standard)</option>
-                <option value={10}>10 Questions (Deep Test)</option>
-              </select>
-
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {preloadedQuizzes.map((pq, idx) => (
               <button
-                onClick={handleGenerateQuiz}
-                disabled={isLoading || !topic.trim()}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-md shadow-indigo-600/30 cursor-pointer"
+                key={idx}
+                onClick={() => handleGenerateQuiz(pq.label)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                  topic === pq.label && questions.length > 0
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                    : 'bg-white/90 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-purple-400'
+                }`}
               >
-                {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                <span>Start</span>
+                <span>{pq.icon}</span>
+                <span>{pq.label}</span>
               </button>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Error Alert Banner */}
+      {/* Error Alert */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
           <button
             onClick={() => handleGenerateQuiz()}
-            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            className="px-3 py-1 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-500 cursor-pointer"
           >
             Retry
           </button>
         </div>
       )}
 
-      {/* Active Quiz Card */}
+      {/* Active Question Card */}
       {questions.length > 0 && !isQuizCompleted && currentQ && (
-        <div className={`p-6 sm:p-8 rounded-3xl border shadow-xl space-y-6 animate-fadeIn ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+        <div className={`p-5 sm:p-6 rounded-2xl border transition-all animate-fadeIn ${
+          darkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-xs'
         }`}>
-          {/* Progress Bar & Counter */}
-          <div className="flex items-center justify-between gap-4 text-xs font-bold">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-mono">
-                Q {currentIndex + 1} of {questions.length}
-              </span>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-500 font-medium">Topic: {topic}</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1 text-slate-500 font-mono">
-                <Timer className="w-3.5 h-3.5" />
-                {formatTimer(timerSeconds)}
-              </span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+          {/* Progress Header */}
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-2 font-bold text-slate-500">
+              <span>Question {currentIndex + 1} of {questions.length}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              <span className="text-purple-600 dark:text-purple-400 font-mono">
                 Score: {score}
               </span>
             </div>
-          </div>
-
-          {/* Progress track */}
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full transition-all duration-300 rounded-full"
-              style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-            />
+            <div className="flex items-center gap-1 font-mono text-xs font-bold text-slate-400">
+              <Timer className="w-3.5 h-3.5 text-purple-500" />
+              <span>{Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, '0')}</span>
+            </div>
           </div>
 
           {/* Question Text */}
-          <div className="py-2">
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug">
-              {currentQ.question}
-            </h2>
-          </div>
+          <h2 className="text-sm sm:text-base font-bold font-outfit mb-5 leading-relaxed text-slate-900 dark:text-white">
+            {currentQ.question}
+          </h2>
 
-          {/* Options */}
-          <div className="space-y-3">
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedOption === idx;
-              const isCorrect = idx === currentQ.correctIndex;
-
-              let optionStyle = darkMode
-                ? 'bg-slate-800/80 border-slate-700 text-slate-200 hover:border-indigo-500'
-                : 'bg-slate-50 border-slate-200 text-slate-800 hover:border-indigo-400';
-
+          {/* 4 Options */}
+          <div className="space-y-2.5 mb-5">
+            {currentQ.options.map((opt, idx) => {
+              let optionStyle = 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-purple-300';
+              if (selectedOption === idx) {
+                optionStyle = 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 ring-2 ring-purple-500/20';
+              }
               if (isAnswerSubmitted) {
-                if (isCorrect) {
-                  optionStyle = 'bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/30';
-                } else if (isSelected && !isCorrect) {
-                  optionStyle = 'bg-rose-500/15 border-rose-500 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/30';
-                } else {
-                  optionStyle = 'opacity-40 border-transparent bg-slate-100 dark:bg-slate-800/40 text-slate-400';
+                if (idx === currentQ.correctAnswer) {
+                  optionStyle = 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-800 dark:text-emerald-200 font-bold';
+                } else if (selectedOption === idx) {
+                  optionStyle = 'bg-rose-50 dark:bg-rose-950/50 border-rose-500 text-rose-800 dark:text-rose-200 font-bold';
                 }
-              } else if (isSelected) {
-                optionStyle = 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 ring-2 ring-indigo-500/30';
               }
 
               return (
                 <button
                   key={idx}
                   onClick={() => handleSelectOption(idx)}
-                  disabled={isAnswerSubmitted}
-                  className={`w-full p-4 rounded-2xl border text-left text-xs sm:text-sm font-semibold transition-all flex items-center justify-between gap-3 ${optionStyle}`}
+                  className={`w-full p-3.5 rounded-xl border text-left text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center justify-between gap-3 ${optionStyle}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-7 h-7 rounded-xl font-mono text-xs flex items-center justify-center shrink-0 border ${
-                      isSelected 
-                        ? 'bg-indigo-600 text-white border-indigo-600' 
-                        : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
                       {String.fromCharCode(65 + idx)}
                     </span>
-                    <span>{option}</span>
+                    <span>{opt}</span>
                   </div>
-
-                  {isAnswerSubmitted && isCorrect && (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  {isAnswerSubmitted && idx === currentQ.correctAnswer && (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                   )}
-                  {isAnswerSubmitted && isSelected && !isCorrect && (
-                    <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                  {isAnswerSubmitted && selectedOption === idx && idx !== currentQ.correctAnswer && (
+                    <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Hint Drawer */}
-          {currentQ.hint && (
-            <div className="pt-1">
-              <button
-                onClick={() => setShowHint(!showHint)}
-                className="text-xs text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 hover:underline"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>{showHint ? 'Hide Hint' : 'Need a Hint?'}</span>
-              </button>
-              {showHint && (
-                <div className="mt-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 font-medium animate-fadeIn">
-                  💡 {currentQ.hint}
-                </div>
-              )}
+          {/* Explanation if Submitted */}
+          {isAnswerSubmitted && currentQ.explanation && (
+            <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-slate-800/80 border border-indigo-200/60 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 leading-relaxed mb-4 animate-fadeIn">
+              💡 <strong className="text-indigo-600 dark:text-indigo-400">Why this is correct:</strong> {currentQ.explanation}
             </div>
           )}
 
-          {/* Explanation Box on Submit */}
-          {isAnswerSubmitted && (
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5 animate-fadeIn">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Detailed Explanation
-              </h4>
-              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                {currentQ.explanation}
-              </p>
-            </div>
-          )}
-
-          {/* Bottom Action Button */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
-            {onOpenVoiceCallWithTopic && (
-              <button
-                onClick={() => onOpenVoiceCallWithTopic(topic)}
-                className="text-xs text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 font-semibold"
-              >
-                Discuss this question on Voice Call
-              </button>
-            )}
-
+          {/* Action Button: Check Answer or Next Question */}
+          <div className="flex items-center justify-between pt-2">
             {!isAnswerSubmitted ? (
               <button
                 onClick={handleSubmitAnswer}
                 disabled={selectedOption === null}
-                className="ml-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs sm:text-sm font-bold shadow-md transition"
+                className="w-full sm:w-auto px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition shadow-md shadow-purple-500/25 cursor-pointer ml-auto"
               >
                 Check Answer
               </button>
             ) : (
               <button
                 onClick={handleNextQuestion}
-                className="ml-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-1.5"
+                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-purple-500/25 cursor-pointer flex items-center justify-center gap-1.5 ml-auto"
               >
-                <span>{currentIndex + 1 < questions.length ? 'Next Question' : 'Finish Quiz'}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>{currentIndex < questions.length - 1 ? 'Next Question' : 'View Final Score'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* Completed Quiz Scorecard */}
+      {/* Quiz Completed Summary */}
       {isQuizCompleted && (
-        <div className={`p-8 rounded-3xl border shadow-2xl text-center space-y-6 animate-fadeIn ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+        <div className={`p-6 sm:p-8 rounded-2xl border text-center transition-all animate-fadeIn ${
+          darkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-xs'
         }`}>
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 text-white shadow-lg text-4xl">
-            🏆
-          </div>
-
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-purple-500/30">
+              <Trophy className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-black font-outfit">
               Quiz Completed!
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Great effort on {topic} · Chapter: {chapter}
+            <div className="text-4xl font-black font-mono text-purple-600 dark:text-purple-400">
+              {score} / {questions.length}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {score === questions.length 
+                ? '🌟 Flawless Mastery! You nailed every concept.' 
+                : score >= 3 
+                ? '👍 Strong grasp of fundamentals! Review missed questions to score 100%.' 
+                : '💡 Keep going! Review the notes or chat with Voice Tutor to solidify this topic.'}
             </p>
-          </div>
 
-          {/* Big Score Card */}
-          <div className="max-w-md mx-auto grid grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Score</span>
-              <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {score}/{questions.length}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Accuracy</span>
-              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                {Math.round((score / questions.length) * 100)}%
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">XP Earned</span>
-              <span className="text-2xl font-black text-amber-500">
-                +{score * 25 + 20}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={handleGenerateQuiz}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow transition flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Retry / New Quiz</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const resObj: QuizResult = {
-                  id: `quiz_${Date.now()}`,
-                  topic: topic,
-                  score: score,
-                  totalQuestions: questions.length,
-                  percentage: Math.round((score / questions.length) * 100),
-                  xpEarned: score * 25 + 20,
-                  timestamp: new Date().toISOString(),
-                  timeSpentSeconds: 120,
-                  userAnswers: userAnswers,
-                };
-                exportQuizResultToPdf(resObj, questions, user.name);
-              }}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow transition flex items-center gap-2"
-              title="Download official quiz result certificate as PDF"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export Result (PDF)</span>
-            </button>
-
-            <button
-              onClick={() => setReviewMode(!reviewMode)}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs sm:text-sm font-bold transition"
-            >
-              {reviewMode ? 'Hide Review' : 'Review All Questions'}
-            </button>
-          </div>
-
-          {/* Review Mode Display */}
-          {reviewMode && (
-            <div className="text-left space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-indigo-500" />
-                <span>Detailed Explanations & Concept Review</span>
-              </h3>
-              {questions.map((q, i) => {
-                const uAns = userAnswers[i];
-                const wasCorrect = uAns === q.correctIndex;
-                return (
-                  <div
-                    key={i}
-                    className={`p-4 rounded-2xl border ${
-                      wasCorrect
-                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
-                        : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-xs mt-0.5">#{i + 1}</span>
-                      <div className="space-y-1">
-                        <p className="text-xs sm:text-sm font-semibold">{q.question}</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-300">
-                          <span className="font-bold">Correct:</span> {q.options[q.correctIndex]}
-                        </p>
-                        {uAns !== undefined && !wasCorrect && (
-                          <p className="text-xs text-rose-600 dark:text-rose-400">
-                            <span className="font-bold">Your answer:</span> {q.options[uAns] || 'Skipped'}
-                          </p>
-                        )}
-                        <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-1">
-                          {q.explanation}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Recent Quiz History */}
-      {history.length > 0 && !isQuizCompleted && questions.length === 0 && (
-        <div className={`p-6 rounded-3xl border ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-        }`}>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span>Recent Quiz Drills & XP History</span>
-          </h3>
-          <div className="space-y-2">
-            {history.slice(0, 4).map((h) => (
-              <div
-                key={h.id}
-                className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between text-xs"
+            <div className="flex items-center justify-center gap-3 pt-3">
+              <button
+                onClick={() => handleGenerateQuiz(topic)}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
               >
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white">{h.topic}</h4>
-                  <p className="text-slate-400 text-[11px]">{new Date(h.timestamp).toLocaleDateString()}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                    {h.score}/{h.totalQuestions} ({h.percentage}%)
-                  </span>
-                  <span className="text-amber-500 font-bold">+{h.xpEarned} XP</span>
-                </div>
-              </div>
-            ))}
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Try Again</span>
+              </button>
+              <button
+                onClick={() => onOpenVoiceCallWithTopic(`Discussing quiz results for ${topic}`)}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Review with Tutor</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -42,6 +42,8 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>(user.selectedVoice || 'female');
+  const [voicePersona, setVoicePersona] = useState<'aditi' | 'rishi' | 'kavya' | 'arjun'>(user.selectedVoice === 'male' ? 'rishi' : 'aditi');
+  const [voiceSubject, setVoiceSubject] = useState<string>('All Subjects');
   const [selectedLanguage, setSelectedLanguage] = useState<IndianLanguageCode>(user.preferredLanguage || 'hi-IN');
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isListeningMic, setIsListeningMic] = useState(false);
@@ -269,13 +271,24 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
     audioService.playSound('pop');
 
     try {
+      const personaMap = {
+        aditi: { name: 'Aditi', tone: 'Warm, patient, crystal-clear mentor who gives relatable real-life examples.' },
+        rishi: { name: 'Rishi', tone: 'Deep, intellectual, structured professor who explains first principles.' },
+        kavya: { name: 'Kavya', tone: 'Dynamic, fast-paced exam specialist who gives smart shortcuts and tricks.' },
+        arjun: { name: 'Arjun', tone: 'Friendly IIT/NEET topper brother who shares practical problem-solving intuition.' },
+      };
+      const curPersona = personaMap[voicePersona] || personaMap.aditi;
+
       const response = await aiService.voiceCallResponse(
         query,
         updatedHistory,
         voiceGender,
         user.ageGroup,
         user.name,
-        selectedLanguage
+        selectedLanguage,
+        curPersona.name,
+        voiceSubject,
+        curPersona.tone
       );
 
       const aiMsg: VoiceCallMessage = {
@@ -427,24 +440,29 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
               )}
             </div>
 
-            {/* Voice Gender Switcher (Desktop / Tablet) */}
-            <div className="hidden sm:flex bg-slate-800/80 p-0.5 rounded-xl border border-slate-700">
-              <button
-                onClick={() => setVoiceGender('female')}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
-                  voiceGender === 'female' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
-                }`}
-              >
-                👩 Aditi
-              </button>
-              <button
-                onClick={() => setVoiceGender('male')}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
-                  voiceGender === 'male' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400'
-                }`}
-              >
-                👨 Rishi
-              </button>
+            {/* Voice Persona Selector (4 Indian Mentors) */}
+            <div className="hidden sm:flex bg-slate-800/90 p-0.5 rounded-xl border border-slate-700 text-[11px] font-bold">
+              {[
+                { id: 'aditi', label: '👩 Aditi', gender: 'female' },
+                { id: 'rishi', label: '👨 Rishi', gender: 'male' },
+                { id: 'kavya', label: '⚡ Kavya', gender: 'female' },
+                { id: 'arjun', label: '🎯 Arjun', gender: 'male' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setVoicePersona(p.id as any);
+                    setVoiceGender(p.gender as any);
+                  }}
+                  className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                    voicePersona === p.id 
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-xs' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
 
             {/* Header Red End Call Button */}
@@ -551,8 +569,28 @@ export const VoiceCallModal: React.FC<VoiceCallModalProps> = ({
               )}
             </div>
 
-            {/* Quick Action Pills */}
+            {/* Subject Specialization Pills */}
             <div className="mt-3 flex flex-wrap justify-center gap-1.5 max-w-sm">
+              <span className="w-full text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Subject Specialization
+              </span>
+              {['All Subjects', 'Mathematics', 'Physics', 'Chemistry', 'Biology'].map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setVoiceSubject(sub)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition cursor-pointer ${
+                    voiceSubject === sub
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 border border-slate-700/60'
+                  }`}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+
+            {/* Quick Action Pills */}
+            <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 max-w-sm">
               {quickPrompts.map((qp, idx) => (
                 <button
                   key={idx}
