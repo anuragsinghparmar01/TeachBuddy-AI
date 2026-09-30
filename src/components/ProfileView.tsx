@@ -119,7 +119,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setShowAvatarPicker(false);
   };
 
-  const isAdmin = user.email?.toLowerCase() === 'anuragsinghparmar95@gmail.com' || user.role === 'admin';
+  const isAdmin = user.email?.trim().toLowerCase() === 'anuragsinghparmar95@gmail.com';
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
@@ -446,27 +446,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Admin Quick Link */}
-      {isAdmin && (
-        <div className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-          darkMode ? 'bg-purple-950/30 border-purple-800/40 text-white' : 'bg-purple-50 border-purple-200 text-purple-950'
-        }`}>
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            <div>
-              <p className="text-xs font-bold">Admin Console</p>
-              <p className="text-[11px] text-purple-600/80 dark:text-purple-300">
-                Manage platform features, announcements, and database configurations.
-              </p>
-            </div>
+      <div className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+        darkMode ? 'bg-purple-950/30 border-purple-800/40 text-white' : 'bg-purple-50 border-purple-200 text-purple-950'
+      }`}>
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <div>
+            <p className="text-xs font-bold">Admin Console</p>
+            <p className="text-[11px] text-purple-600/80 dark:text-purple-300">
+              Manage platform features, announcements, fonts, and syllabi.
+            </p>
           </div>
-          <button
-            onClick={onOpenAdmin}
-            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition cursor-pointer"
-          >
-            Open Admin
-          </button>
         </div>
-      )}
+        <button
+          onClick={onOpenAdmin}
+          className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition cursor-pointer active:scale-95 shadow-sm"
+        >
+          Open Admin
+        </button>
+      </div>
     </div>
   );
 };

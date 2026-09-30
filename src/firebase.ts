@@ -57,6 +57,7 @@ try {
   }
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
 } catch (err) {
   // Graceful offline fallback
 }
@@ -75,8 +76,8 @@ const STORAGE_KEYS = {
 // Default Admin settings
 export const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
   appName: 'TeachBuddy AI',
-  announcementBanner: '🚀 Welcome to TeachBuddy AI — Learn • Grow • Together! 100% Free AI Tutor & Voice Study Buddy in Indian Languages.',
-  announcementEnabled: true,
+  announcementBanner: '',
+  announcementEnabled: false,
   premiumPriceMonthly: 0,
   promoDiscountPercent: 0,
   activeFont: 'Outfit',
@@ -371,9 +372,17 @@ export function getLocalAdminSettings(): AdminSettings {
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
+      // Ensure the old default welcome banner is removed
+      const isOldBanner =
+        typeof parsed?.announcementBanner === 'string' &&
+        (parsed.announcementBanner.includes('100% Free AI Tutor') ||
+          parsed.announcementBanner.includes('Welcome to TeachBuddy AI') ||
+          parsed.announcementBanner.includes('Learn • Grow • Together'));
       return {
         ...DEFAULT_ADMIN_SETTINGS,
         ...parsed,
+        announcementBanner: isOldBanner ? '' : (parsed.announcementBanner || ''),
+        announcementEnabled: isOldBanner ? false : Boolean(parsed.announcementEnabled),
         features: {
           ...DEFAULT_ADMIN_SETTINGS.features,
           ...(parsed?.features || {}),
@@ -397,9 +406,16 @@ export async function getAdminSettings(): Promise<AdminSettings> {
             clearTimeout(timer);
             if (snap.exists()) {
               const data = snap.data() as Partial<AdminSettings>;
+              const isOldBanner =
+                typeof data?.announcementBanner === 'string' &&
+                (data.announcementBanner.includes('100% Free AI Tutor') ||
+                  data.announcementBanner.includes('Welcome to TeachBuddy AI') ||
+                  data.announcementBanner.includes('Learn • Grow • Together'));
               const merged: AdminSettings = {
                 ...DEFAULT_ADMIN_SETTINGS,
                 ...data,
+                announcementBanner: isOldBanner ? '' : (data.announcementBanner || ''),
+                announcementEnabled: isOldBanner ? false : Boolean(data.announcementEnabled),
                 features: {
                   ...DEFAULT_ADMIN_SETTINGS.features,
                   ...(data?.features || {}),
@@ -427,7 +443,8 @@ export async function getAdminSettings(): Promise<AdminSettings> {
   return getLocalAdminSettings();
 }
 
-export async function saveAdminSettings(settings: AdminSettings): Promise<void> {
+export async function saveAdminSettings(settings: AdminSettings, userEmail?: string): Promise<void> {
+  // Save locally first for instant reactive UI
   localStorage.setItem(STORAGE_KEYS.ADMIN_SETTINGS, JSON.stringify(settings));
 
   if (db) {
@@ -436,6 +453,19 @@ export async function saveAdminSettings(settings: AdminSettings): Promise<void> 
       await setDoc(settingsRef, settings, { merge: true });
     } catch (e) {
       console.warn('Firestore save admin settings notice:', e);
+      // Even if Firestore encounters network issues, local state persists
     }
   }
 }
+
+export async function logoutUser(): Promise<void> {
+  try {
+    if (auth) {
+      await signOut(auth);
+    }
+  } catch (e) {
+    console.warn('Sign out warning:', e);
+  }
+  localStorage.removeItem(STORAGE_KEYS.USER);
+}
+

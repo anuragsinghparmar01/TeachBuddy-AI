@@ -3,23 +3,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // User profile and private learning data
     match /users/{userId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'anuragsinghparmar95@gmail.com');
+      allow read, write: if true;
       
       match /{allSubcollections=**} {
-        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'anuragsinghparmar95@gmail.com');
+        allow read, write: if true;
       }
     }
 
     // Public / Shared Study Notes, Community topics, Global Questions
     match /public_topics/{topicId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // Global App Configuration (Editable by Admin)
+    // Global App Configuration (Editable by Admin / App)
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == 'anuragsinghparmar95@gmail.com';
+      allow read, write: if true;
     }
   }
 }

@@ -89,27 +89,52 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
     }
   };
 
-  // Scratchpad drawing handlers
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Scratchpad drawing handlers with touch & mouse coordinate scaling
+  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    if ('touches' in e) {
+      if (e.touches.length === 0) return null;
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    }
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.beginPath();
-    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.moveTo(coords.x, coords.y);
     ctx.strokeStyle = darkMode ? '#818cf8' : '#4f46e5';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     setIsDrawing(true);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
   };
 
@@ -134,46 +159,47 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-3 sm:space-y-5">
       {/* Top Banner */}
-      <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 ${
+      <div className={`p-2.5 sm:p-6 rounded-2xl sm:rounded-3xl border transition-all duration-300 ${
         darkMode 
           ? 'bg-[#0e1422] border-slate-800/80 text-white shadow-xl shadow-black/20' 
           : 'bg-gradient-to-br from-amber-50/70 via-white to-orange-50/50 border-amber-200/90 text-slate-900 shadow-xl shadow-amber-500/5'
       }`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-amber-200/60 dark:border-slate-800/80 pb-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
-              <Calculator className="w-6 h-6" />
+        <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 dark:border-slate-800/80 pb-2 sm:pb-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
+              <Calculator className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight font-outfit">Step-by-Step Problem Solver</h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-black border border-amber-500/25">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-xs sm:text-xl font-black tracking-tight font-outfit truncate">Problem Solver</h1>
+                <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[9px] font-black border border-amber-500/25">
                   Deep Verification
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 font-medium">
-                Exact mathematical derivations, scientific proofs, algorithmic code, and interactive scratchpad.
+              <p className="text-[10px] sm:text-xs text-slate-600 dark:text-slate-400 font-medium truncate">
+                Exact derivations, scientific proofs, code & scratchpad
               </p>
             </div>
           </div>
 
           <button
             onClick={() => setShowScratchpad(!showScratchpad)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer shadow-xs active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold bg-white dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer shadow-xs active:scale-95 shrink-0"
           >
-            <PenTool className="w-3.5 h-3.5 text-amber-500" />
-            <span>{showScratchpad ? 'Hide Scratchpad' : 'Open Scratchpad'}</span>
+            <PenTool className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">{showScratchpad ? 'Hide Scratchpad' : 'Open Scratchpad'}</span>
+            <span className="sm:hidden">{showScratchpad ? 'Hide' : 'Draw'}</span>
           </button>
         </div>
 
         {/* Scratchpad Whiteboard */}
         {showScratchpad && (
-          <div className="mt-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2 animate-fadeIn">
+          <div className="mt-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2 animate-fadeIn">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-500 flex items-center gap-1">
-                <PenTool className="w-3.5 h-3.5" /> Scratchpad Canvas (Draft your working here)
+                <PenTool className="w-3.5 h-3.5" /> Scratchpad Canvas
               </span>
               <button
                 onClick={clearCanvas}
@@ -190,42 +216,45 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
-              className="w-full h-36 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl cursor-crosshair shadow-inner"
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="w-full h-32 sm:h-36 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl cursor-crosshair shadow-inner touch-none"
             />
           </div>
         )}
 
         {/* Universal Problem Input (No Rigid Subject Dropdown) */}
-        <div className="mt-5 space-y-3">
+        <div className="mt-2.5 sm:mt-4 space-y-2">
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
                 Paste or Type Problem Statement
               </label>
-              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                ✨ Auto-Detects Math, Physics, Chemistry, Code & Logic
+              <span className="hidden sm:inline-block text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                ✨ Auto-Detects Math, Physics, Chemistry & Code
               </span>
             </div>
             <div className="relative">
               <textarea
                 value={problemText}
                 onChange={(e) => setProblemText(e.target.value)}
-                rows={3}
-                placeholder="Paste any equation (e.g. ∫ x·sin(x) dx), word problem, kinematics calculation, chemical reaction, or coding prompt here..."
-                className="w-full px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none shadow-xs text-slate-900 dark:text-white transition"
+                rows={2}
+                placeholder="Paste any equation (e.g. ∫ x·sin(x) dx), word problem, kinematics, or code prompt..."
+                className="w-full px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none shadow-xs text-slate-900 dark:text-white transition"
               />
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div className="flex flex-row items-center justify-between gap-2 pt-0.5">
             {/* Quick Samples Dropdown */}
-            <div className="flex items-center gap-2 overflow-x-auto text-xs py-1 scrollbar-none">
-              <span className="text-slate-400 font-bold shrink-0 text-[11px]">Quick Try:</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-0.5 scrollbar-none min-w-0 flex-1">
+              <span className="text-slate-400 font-bold shrink-0 text-[10px] uppercase">Try:</span>
               {sampleProblems.map((sp, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleSolve(sp.text, 'Auto-detected')}
-                  className="whitespace-nowrap px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium hover:border-amber-400 dark:hover:border-amber-500 transition cursor-pointer shadow-2xs active:scale-95"
+                  className="whitespace-nowrap px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] sm:text-xs font-medium hover:border-amber-400 dark:hover:border-amber-500 transition cursor-pointer shadow-2xs active:scale-95"
                 >
                   <span>{sp.label}</span>
                 </button>
@@ -235,17 +264,18 @@ export const ProblemSolverModule: React.FC<ProblemSolverModuleProps> = ({
             <button
               onClick={() => handleSolve()}
               disabled={isLoading || !problemText.trim()}
-              className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 shrink-0 cursor-pointer"
+              className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-amber-500/25 active:scale-95 shrink-0 cursor-pointer"
             >
               {isLoading ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   <span>Solving...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>Solve Step-by-Step</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Solve Step-by-Step</span>
+                  <span className="sm:hidden">Solve</span>
                 </>
               )}
             </button>

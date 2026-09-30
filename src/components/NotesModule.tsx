@@ -122,67 +122,68 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="max-w-5xl mx-auto space-y-3 sm:space-y-4">
       {/* Top Banner: Single Clean Search & Preloaded Chips */}
-      <div className={`p-5 sm:p-6 rounded-3xl border transition-all duration-300 ${
+      <div className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all duration-300 ${
         darkMode 
           ? 'bg-slate-900/90 border-slate-800 text-white shadow-xl shadow-black/20' 
           : 'bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 border-emerald-200/90 text-slate-900 shadow-xl shadow-emerald-500/5'
       }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
-              <BookOpen className="w-5 h-5" />
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight font-outfit">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-xs sm:text-lg font-black tracking-tight font-outfit truncate">
                   Smart Revision Notes
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-black text-[10px] border border-emerald-500/20">
+                <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-black text-[9px] border border-emerald-500/20">
                   1-Click Ready
                 </span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                Type any topic or tap a pre-loaded concept to get instant structured notes
+              <p className="text-[10px] sm:text-xs text-slate-600 dark:text-slate-400 font-medium truncate">
+                Type any topic or tap a concept below for structured notes
               </p>
             </div>
           </div>
         </div>
 
-        {/* Single Simple Topic Input */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
+        {/* Single Simple Topic Input (Single row on mobile & desktop) */}
+        <div className="flex flex-row gap-1.5 sm:gap-2">
+          <div className="relative flex-1 min-w-0">
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleGenerateNotes()}
-              placeholder="e.g. Newton's 3 Laws of Motion, Cell Structure..."
-              className="w-full px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-emerald-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs text-slate-900 dark:text-white"
+              placeholder="e.g. Newton's Laws, Cell Structure..."
+              className="w-full px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-emerald-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs text-slate-900 dark:text-white"
             />
           </div>
           <button
             onClick={() => handleGenerateNotes()}
             disabled={isLoading || !topic.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 cursor-pointer whitespace-nowrap active:scale-95"
+            className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
           >
-            <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>{isLoading ? 'Generating Notes...' : 'Get Notes'}</span>
+            <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isLoading ? 'Generating Notes...' : 'Get Notes'}</span>
+            <span className="sm:hidden">{isLoading ? '...' : 'Notes'}</span>
           </button>
         </div>
 
         {/* Preloaded 1-Click Topic Chips */}
-        <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Loaded Basic Topics (Tap to open):
-          </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+              Topics:
+            </span>
             {preloadedTopics.map((pt, idx) => (
               <button
                 key={idx}
                 onClick={() => handleGenerateNotes(pt.label, pt.subject)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl border text-[11px] sm:text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1 ${
                   topic === pt.label
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                     : 'bg-white/90 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-400'

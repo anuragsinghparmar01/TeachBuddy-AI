@@ -163,7 +163,7 @@ export const AiMascotWidget: React.FC<AiMascotWidgetProps> = ({
   };
 
   return (
-    <div className="fixed bottom-18 sm:bottom-6 right-3 sm:right-6 z-40 flex flex-col items-end">
+    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-40 flex flex-col items-end">
       {/* Interactive Assistant Card */}
       {isOpen && (
         <div 
@@ -173,7 +173,7 @@ export const AiMascotWidget: React.FC<AiMascotWidgetProps> = ({
               ? 'bg-slate-900/98 border-indigo-500/30 text-white backdrop-blur-xl' 
               : 'bg-white/98 border-indigo-200 text-slate-900 backdrop-blur-xl'
           }`}
-          style={{ height: 'min(580px, 76vh)' }}
+          style={{ height: 'min(520px, calc(100dvh - 140px))' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-800/60 shrink-0">

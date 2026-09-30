@@ -35,7 +35,8 @@ import {
   Clock,
   Radio,
   Lock,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import type { UserProfile, IndianLanguageCode, VoiceGender, ModuleApiKeys, AppFont, InstitutionType } from '../types';
 import { INDIAN_LANGUAGES, DEFAULT_MODULE_API_KEYS } from '../types';
@@ -1171,6 +1172,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* 9. ADMIN CONSOLE ACCESS */}
+      <div className={`p-6 sm:p-7 rounded-3xl border transition-all ${
+        darkMode ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200/90 text-slate-900 shadow-sm'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shrink-0 bg-purple-600 shadow-md shadow-purple-600/30">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Admin Control Center</h3>
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                  Full Access Enabled
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Manage platform announcements, feature toggles, fonts, and curriculum subjects.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenAdmin}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer self-start sm:self-auto active:scale-95 bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Open Admin Console</span>
+          </button>
         </div>
       </div>
     </div>

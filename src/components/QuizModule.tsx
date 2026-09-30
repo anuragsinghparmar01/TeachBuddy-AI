@@ -183,40 +183,40 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
   const currentQ = questions[currentIndex];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
       {/* Top Banner: Single Clean Search & Preloaded Chips */}
-      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+      <div className={`p-2.5 sm:p-5 rounded-2xl border transition-all ${
         darkMode 
           ? 'bg-slate-900/90 border-slate-800 text-white shadow-xl shadow-black/20' 
           : 'bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-pink-50/70 border-indigo-100 text-slate-900 shadow-md shadow-indigo-100/50'
       }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/30 shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/30 shrink-0">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight font-outfit">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-xs sm:text-lg font-black tracking-tight font-outfit truncate">
                   Instant Practice Quiz
                 </h1>
-                <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
+                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
                   Adaptive MCQs
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Test concepts with 5 high-yield multiple choice questions and instant explanations
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
+                5 multiple choice questions with instant explanations
               </p>
             </div>
           </div>
 
           {/* Difficulty Chips */}
-          <div className="flex items-center gap-1 self-start sm:self-center">
+          <div className="flex items-center gap-1 shrink-0">
             {['Easy', 'Medium', 'Hard'].map((diff) => (
               <button
                 key={diff}
                 onClick={() => setDifficulty(diff)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold transition cursor-pointer ${
                   difficulty === diff
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
@@ -228,32 +228,33 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
           </div>
         </div>
 
-        {/* Single Topic Input */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        {/* Single Topic Input (Single row on mobile & desktop) */}
+        <div className="flex flex-row gap-1.5 sm:gap-2">
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleGenerateQuiz()}
-            placeholder="e.g. Calculus Derivatives, Indian Constitution..."
-            className="flex-1 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-xs text-slate-900 dark:text-white"
+            placeholder="e.g. Calculus, Indian Constitution..."
+            className="flex-1 min-w-0 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-xs text-slate-900 dark:text-white"
           />
           <button
             onClick={() => handleGenerateQuiz()}
             disabled={isLoading || !topic.trim()}
-            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md shadow-purple-500/25 cursor-pointer whitespace-nowrap"
+            className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/25 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>{isLoading ? 'Creating 5 Questions...' : 'Start Quiz'}</span>
+            <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isLoading ? 'Creating 5 Questions...' : 'Start Quiz'}</span>
+            <span className="sm:hidden">{isLoading ? '...' : 'Start'}</span>
           </button>
         </div>
 
         {/* Preloaded Quiz Chips */}
-        <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Loaded Basic Quizzes (Tap to start):
-          </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+              Quizzes:
+            </span>
             {preloadedQuizzes.map((pq, idx) => (
               <button
                 key={idx}

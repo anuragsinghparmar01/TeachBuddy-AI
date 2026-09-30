@@ -309,20 +309,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           ? 'bg-[#090d16]/90 border-slate-800/80 text-white shadow-xl shadow-black/40' 
           : 'bg-white/90 border-indigo-100/80 text-slate-900 shadow-sm shadow-indigo-100/50'
       }`}>
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-11 sm:h-14 md:h-16 flex items-center justify-between gap-1.5 sm:gap-3">
           
           {/* Brand - TeachBuddy AI */}
           <div 
-            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none group shrink-0" 
+            className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer select-none group shrink-0 min-w-0" 
             onClick={() => handleNavigate('explain')}
           >
-            <AiIcon size="sm" variant="gemini" glow={true} pulse={false} />
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors font-outfit">
+            <div className="sm:hidden shrink-0">
+              <AiIcon size="xs" variant="gemini" glow={false} pulse={false} />
+            </div>
+            <div className="hidden sm:block shrink-0">
+              <AiIcon size="sm" variant="gemini" glow={true} pulse={false} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="text-xs sm:text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors font-outfit truncate">
                   TeachBuddy<span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-500 bg-clip-text text-transparent">AI</span>
                 </span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
@@ -521,57 +526,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                       })}
                     </div>
                   )}
-
-                  {/* Certification Quick CTA inside More Dropdown */}
-                  <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                        <Award className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">
-                          Course Certification Helpdesk
-                        </span>
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Helpline: 9455109687
-                        </p>
-                      </div>
-                    </div>
-                    <a
-                      href="tel:9455109687"
-                      className="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition"
-                    >
-                      <Phone className="w-3 h-3" />
-                      <span>Call</span>
-                    </a>
-                  </div>
                 </div>
               )}
             </div>
           </nav>
 
           {/* Actions & Utilities Right Header */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             
             {/* Quick Language Selector */}
             <div className="relative">
               <button
                 onClick={() => setIsLangOpen(!isLangOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-xs font-semibold hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-xs font-semibold hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer"
                 title="Select Indian Language"
               >
-                <Globe className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-500 shrink-0" />
                 <span className="hidden sm:inline font-medium">{currentLangObj.name}</span>
-                <span className="sm:hidden text-xs">{currentLangObj.flag}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <span className="sm:hidden text-[11px] leading-none">{currentLangObj.flag}</span>
+                <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
               </button>
 
               {isLangOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 animate-fadeIn">
+                <div className="absolute right-0 mt-2 w-52 sm:w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 animate-fadeIn">
                   <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Select Indian Language
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
+                  <div className="max-h-60 overflow-y-auto">
                     {INDIAN_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
@@ -596,7 +577,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {features?.voiceCallEnabled && (
               <button
                 onClick={onOpenVoiceCall}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-md shadow-indigo-500/25 active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 p-1.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
                 title="Start Voice Session with TeachBuddy"
               >
                 <PhoneCall className="w-3.5 h-3.5 fill-white/20 animate-pulse" />
@@ -607,44 +588,44 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Theme Toggle (Rich Light & Dark Mode) */}
             <button
               onClick={onToggleDarkMode}
-              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/60 active:scale-90"
+              className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/60 active:scale-90"
               title={darkMode ? "Switch to Vibrant Light Mode" : "Switch to Deep Dark Mode"}
             >
               {darkMode ? (
-                <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 animate-spin-slow" />
               ) : (
-                <Moon className="w-4 h-4 text-indigo-600" />
+                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
               )}
             </button>
 
             {/* Direct Settings Header Action */}
             <button
               onClick={() => handleNavigate('settings')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+              className={`flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
                 currentTab === 'settings'
-                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-transparent shadow-md shadow-indigo-500/25 ring-2 ring-indigo-500/30'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-transparent shadow-xs ring-1 ring-indigo-500/30'
                   : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border-slate-200/60 dark:border-slate-700/60'
               }`}
-              title="Settings & Preferences (API Keys, Audio, Voice, Fonts, Themes)"
+              title="Settings & Preferences"
             >
-              <Settings className={`w-4 h-4 ${currentTab === 'settings' ? 'rotate-90 text-white' : 'text-slate-500 dark:text-slate-400 hover:rotate-45 transition-transform duration-300'}`} />
+              <Settings className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${currentTab === 'settings' ? 'rotate-90 text-white' : 'text-slate-500 dark:text-slate-400'}`} />
               <span className="hidden sm:inline">Settings</span>
             </button>
 
             {/* Mobile Menu Button (Hamburger) */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               title="Toggle Menu"
             >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {/* Mobile Full Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl p-4 shadow-2xl animate-fadeIn space-y-4 max-h-[85vh] overflow-y-auto">
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl p-3 shadow-2xl animate-fadeIn space-y-3 max-h-[calc(100dvh-2.75rem)] overflow-y-auto pb-20">
             {/* Quick 5 Main Tabs on Top */}
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
@@ -827,8 +808,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}>
               <Layers className="w-4 h-4" />
             </div>
-            <span className="text-[10px] tracking-tight leading-none mt-1">
-              {isMoreActive && activeMoreItem ? activeMoreItem.label.split(' ')[0] : 'More'}
+            <span className="text-[10px] tracking-tight leading-none mt-1 font-bold">
+              More
             </span>
           </button>
         </div>

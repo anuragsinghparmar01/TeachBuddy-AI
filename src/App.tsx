@@ -7,8 +7,12 @@ import {
   saveLocalUser, 
   getLocalAdminSettings,
   getAdminSettings,
-  listenToUserProfile 
+  listenToUserProfile,
+  auth,
+  getUserProfile,
+  logoutUser
 } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 import { Navbar } from './components/Navbar';
 import { TeachingModule } from './components/TeachingModule';
@@ -35,7 +39,16 @@ import { AuthPortal } from './components/AuthPortal';
 import { OpeningAnimation } from './components/OpeningAnimation';
 import { AdminPanel } from './components/AdminPanel';
 
-import { PhoneCall } from 'lucide-react';
+import { 
+  PhoneCall, 
+  Sparkles, 
+  Zap, 
+  BookOpen, 
+  Calculator, 
+  PenTool, 
+  CheckCircle2, 
+  Gamepad2 
+} from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile>(() => getLocalUser());
@@ -90,6 +103,40 @@ export default function App() {
     });
   };
 
+  // Listen for Firebase Auth state changes
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const profile = await getUserProfile(firebaseUser.uid);
+          const isAdminUser = Boolean(firebaseUser.email?.toLowerCase() === 'anuragsinghparmar95@gmail.com' || firebaseUser.email?.includes('admin'));
+          if (profile) {
+            setUser((prev) => ({
+              ...prev,
+              ...profile,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || profile.email,
+              role: isAdminUser ? 'admin' : (profile.role || 'student'),
+              isAuthenticated: true,
+            }));
+          } else {
+            handleUpdateUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'Student Scholar',
+              role: isAdminUser ? 'admin' : 'student',
+              isAuthenticated: true,
+            });
+          }
+        } catch (e) {
+          console.warn('onAuthStateChanged load notice:', e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // If user is signed in with Firebase UID, sync real-time changes
   useEffect(() => {
     if (user.uid && user.isAuthenticated) {
@@ -115,9 +162,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Cross module navigation helper: Jump to 3D Pomodoro Focus Timer with a pre-filled goal
+  const handleStartFocusForTopic = (topic: string) => {
+    setCurrentTopicForModule(topic);
+    setActiveTab('focus');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Font family class helper based on settings
   const getActiveFontClass = () => {
-    switch (user.fontFamily) {
+    switch ((user as any).fontFamily) {
       case 'dyslexic':
         return 'font-dyslexic';
       case 'serif':
@@ -170,11 +224,28 @@ export default function App() {
     );
   }
 
+  const quickStudioModules: { id: ActiveTab; label: string; icon: any }[] = [
+    { id: 'explain', label: 'AI Concept Tutor', icon: Sparkles },
+    { id: 'focus', label: 'Pomodoro Focus', icon: Zap },
+    { id: 'notes', label: 'Smart Notes', icon: BookOpen },
+    { id: 'solver', label: 'Problem Solver', icon: Calculator },
+    { id: 'whiteboard', label: 'Visual Canvas', icon: PenTool },
+    { id: 'quiz', label: 'Practice Quiz', icon: CheckCircle2 },
+    { id: 'games', label: 'Brain Games', icon: Gamepad2 },
+  ];
+
   // STEP 3: Main Website Application
   return (
-    <div className={`min-h-screen transition-colors duration-200 flex flex-col ${getActiveFontClass()} ${
-      darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50/50 text-slate-800'
+    <div className={`min-h-screen transition-colors duration-200 flex flex-col relative ${getActiveFontClass()} ${
+      darkMode ? 'bg-[#060913] text-slate-100' : 'bg-slate-50/40 text-slate-800'
     }`}>
+      {/* Subtle Ambient Aurora Glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-32 left-1/4 w-96 h-96 rounded-full bg-indigo-500/8 dark:bg-indigo-500/12 blur-3xl" />
+        <div className="absolute top-1/3 -right-24 w-80 h-80 rounded-full bg-sky-500/8 dark:bg-sky-500/10 blur-3xl" />
+        <div className="absolute -bottom-32 left-1/3 w-96 h-96 rounded-full bg-violet-500/8 dark:bg-violet-500/10 blur-3xl" />
+      </div>
+
       {/* Clean, Professional Top Navbar */}
       <Navbar
         user={user}
@@ -191,7 +262,38 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 lg:pb-8">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6 pb-24 sm:pb-28 lg:pb-12 overflow-x-hidden">
+        
+        {/* Modern Studio Switcher Bar */}
+        <div className="max-w-4xl mx-auto mb-4 sm:mb-5">
+          <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs scrollbar-none">
+            {quickStudioModules.map((mod) => {
+              const Icon = mod.icon;
+              const isCurrent =
+                (mod.id === 'explain' && (activeTab === 'explain' || activeTab === 'teach' || activeTab === 'dashboard')) ||
+                (mod.id === 'quiz' && (activeTab === 'quiz' || activeTab === 'quizzes')) ||
+                activeTab === mod.id;
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => {
+                    setActiveTab(mod.id);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    isCurrent
+                      ? 'btn-premium-indigo text-white font-bold'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/70'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isCurrent ? 'text-white' : 'text-indigo-500 dark:text-indigo-400'}`} />
+                  <span>{mod.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {(activeTab === 'explain' || activeTab === 'teach' || activeTab === 'dashboard') && (
           <TeachingModule
             user={user}
@@ -199,6 +301,7 @@ export default function App() {
             onUpdateUser={handleUpdateUser}
             onOpenVoiceCallWithTopic={handleOpenVoiceCall}
             onStartQuizForTopic={handleStartQuizForTopic}
+            onStartFocusForTopic={handleStartFocusForTopic}
             initialTopic={currentTopicForModule}
           />
         )}
@@ -225,6 +328,7 @@ export default function App() {
             darkMode={darkMode}
             onUpdateUser={handleUpdateUser}
             onOpenVoiceCallWithTopic={handleOpenVoiceCall}
+            initialGoal={currentTopicForModule}
           />
         )}
 
@@ -321,8 +425,9 @@ export default function App() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onOpenAuth={() => setIsAuthOpen(true)}
-            onLogout={() => {
-              handleUpdateUser({ isAuthenticated: false, email: '' });
+            onLogout={async () => {
+              await logoutUser();
+              handleUpdateUser({ isAuthenticated: false, email: '', uid: '' });
             }}
             onOpenAdmin={() => setIsAdminOpen(true)}
           />
@@ -370,7 +475,7 @@ export default function App() {
         <aside aria-label="Voice Tutor Call" className="fixed bottom-20 sm:bottom-6 right-22 sm:right-26 z-30 hidden sm:block">
           <button
             onClick={() => handleOpenVoiceCall()}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all hover:scale-105 active:scale-95 cursor-pointer border border-indigo-400/30"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl btn-premium-indigo text-white cursor-pointer"
             title="Start Live Voice Session"
           >
             <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center">
@@ -382,34 +487,6 @@ export default function App() {
           </button>
         </aside>
       )}
-
-      {/* Sleek, Minimalist Bottom Footer with Rich Colors & No Dull Grey Clutter */}
-      <footer className={`mt-auto border-t py-3.5 text-xs transition-colors mb-16 lg:mb-0 ${
-        darkMode ? 'bg-slate-950/90 border-indigo-500/20 text-slate-300' : 'bg-white/95 border-indigo-100 text-slate-700'
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded-lg overflow-hidden border border-indigo-500/30 bg-slate-950 shrink-0">
-              <img src="/logo.png" alt="TeachBuddy AI" className="w-full h-full object-cover" />
-            </div>
-            <span className="font-extrabold bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent text-xs">
-              TeachBuddy AI
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Active
-            </span>
-          </div>
-
-          <a 
-            href="tel:9455109687"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 font-bold hover:scale-105 transition cursor-pointer"
-          >
-            <span>📜 Certification Hotline:</span>
-            <span className="font-black text-indigo-600 dark:text-indigo-400">📞 9455109687</span>
-          </a>
-        </div>
-      </footer>
 
       {/* Modals & Dialogs */}
       <VoiceCallModal
@@ -438,6 +515,8 @@ export default function App() {
         onClose={() => setIsAdminOpen(false)}
         settings={adminSettings}
         onUpdateSettings={(newSettings) => setAdminSettings(newSettings)}
+        user={user}
+        onAuthenticateAdmin={() => setIsAuthOpen(true)}
       />
     </div>
   );
