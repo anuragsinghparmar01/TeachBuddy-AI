@@ -1,3 +1,5 @@
+Kindly do add this API Key AQ.Ab8RN6KFTLcmmTLoAYw7xium9qWsc6L9y-K90ko78_mL_CgDFA in the Settings menu in the Web App
+
 <div align="center">
 
 # ✨ TeachBuddy AI
